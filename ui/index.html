@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ResourceLens</title>
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="network.css">
+<link rel="stylesheet" href="rules.css">
+<link rel="stylesheet" href="counters.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M5 18h6l3-8 4 14 3-9h6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="brand-text"><b>ResourceLens</b><span data-i18n="tagline"></span></div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-page="overview"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3zm0 8h8v-6H3zm10 0h8V11h-8zm0-18v6h8V3z"/></svg><span data-i18n="nav.overview"></span></button>
+      <button class="nav-item" data-page="perf"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span data-i18n="nav.perf"></span></button>
+      <button class="nav-item" data-page="moments"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span data-i18n="nav.moments"></span></button>
+      <button class="nav-item" data-page="live"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="nav.live"></span></button>
+      <button class="nav-item" data-page="processes"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span data-i18n="nav.processes"></span></button>
+      <button class="nav-item" data-page="insights"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3A7 7 0 0 0 12 2zM9 21h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="nav.insights"></span></button>
+      <button class="nav-item" data-page="startup"><svg viewBox="0 0 24 24"><path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span data-i18n="nav.startup"></span></button>
+      <button class="nav-item" data-page="services"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="18" height="6" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 7h.01M7 17h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span data-i18n="nav.services"></span></button>
+      <button class="nav-item" data-page="network"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span data-i18n="nav.network"></span></button>
+      <button class="nav-item" data-page="rules"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="18" cy="18" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg><span data-i18n="nav.rules"></span></button>
+      <button class="nav-item" data-page="counters"><svg viewBox="0 0 24 24"><path d="M3 3v18h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 15l3-4 3 2 5-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="nav.counters"></span></button>
+      <button class="nav-item" data-page="settings"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span data-i18n="nav.settings"></span></button>
+    </nav>
+    <div class="side-foot">
+      <div class="rec"><span class="dot"></span><span id="recText"></span></div>
+      <div class="self" id="selfMeter"></div>
+      <div class="side-meta" id="sideMeta"></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="title-wrap">
+        <h1 id="pageTitle"></h1>
+        <div class="subtitle" id="pageSub"></div>
+      </div>
+      <div class="top-actions">
+        <button class="btn back-btn hidden" id="btnBack"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="range.back"></span></button>
+        <div class="range" id="rangeBar">
+          <button data-range="boot" data-i18n="range.boot"></button>
+          <button data-range="1h" data-i18n="range.1h"></button>
+          <button data-range="6h" data-i18n="range.6h"></button>
+          <button data-range="24h" data-i18n="range.24h"></button>
+          <button data-range="7d" data-i18n="range.7d"></button>
+          <button data-range="30d" data-i18n="range.30d"></button>
+          <button data-range="custom" data-i18n="range.custom"></button>
+        </div>
+        <button class="icon-btn" id="btnLang"><span id="langLabel">EN</span></button>
+        <button class="icon-btn" id="btnTheme"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
+      </div>
+    </header>
+    <div class="custom-range hidden" id="customRange">
+      <label><span data-i18n="range.from"></span><input type="datetime-local" step="1" id="cFrom"></label>
+      <label><span data-i18n="range.to"></span><input type="datetime-local" step="1" id="cTo"></label>
+      <select id="bootPick"></select>
+      <button class="btn primary" id="cApply" data-i18n="range.apply"></button>
+    </div>
+
+    <div class="content">
+      <!-- ================= OVERVIEW ================= -->
+      <section class="page" id="page-overview">
+        <div class="kpis" id="kpis"></div>
+        <div class="strip" id="strip"></div>
+        <div class="chart-bar">
+          <div class="hint"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2zM9 21h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span data-i18n="chart.hint"></span></div>
+          <div class="tool-group"><span class="muted" data-i18n="chart.span"></span><div class="seg" id="spanSeg"></div></div>
+        </div>
+        <div class="card nav-card hidden" id="navCard"><div class="nav-head"><span class="muted" data-i18n="chart.navHint"></span><span class="num" id="navLabel"></span></div><div class="chart nav-chart" id="ch-nav"></div></div>
+        <div class="grid-charts">
+          <div class="card chart-card"><div class="card-head"><h3 data-i18n="chart.cpuOnly"></h3><div class="legend" id="lg-cpu"></div></div><div class="chart" id="ch-cpu"></div></div>
+          <div class="card chart-card"><div class="card-head"><h3 data-i18n="chart.gpu"></h3><div class="legend" id="lg-gpu"></div></div><div class="chart" id="ch-gpu"></div></div>
+          <div class="card chart-card"><div class="card-head"><h3 data-i18n="chart.mem"></h3><div class="legend" id="lg-mem"></div></div><div class="chart" id="ch-mem"></div></div>
+          <div class="card chart-card"><div class="card-head"><h3 data-i18n="chart.temp"></h3><div class="legend" id="lg-temp"></div></div><div class="chart" id="ch-temp"></div></div>
+          <div class="card chart-card"><div class="card-head"><h3 data-i18n="chart.disk"></h3><div class="legend" id="lg-disk"></div></div><div class="chart" id="ch-disk"></div></div>
+          <div class="card chart-card"><div class="card-head"><h3 data-i18n="chart.net"></h3><div class="legend" id="lg-net"></div></div><div class="chart" id="ch-net"></div></div>
+          <div class="card chart-card wide"><div class="card-head"><h3 data-i18n="chart.clock"></h3><div class="legend" id="lg-clock"></div></div><div class="chart" id="ch-clock"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3 data-i18n="ov.topTitle"></h3><button class="link" data-goto="processes" data-i18n="ov.seeAll"></button></div>
+          <div id="ovTop"></div>
+        </div>
+      </section>
+
+      <!-- ================= PERFORMANCE ================= -->
+      <section class="page hidden" id="page-perf">
+        <div class="perf">
+          <div class="perf-list" id="perfList"></div>
+          <div class="perf-main" id="perfMain"><div class="skeleton" style="height:400px"></div></div>
+        </div>
+      </section>
+
+      <!-- ================= MOMENTS ================= -->
+      <section class="page hidden" id="page-moments">
+        <div class="toolbar">
+          <div class="tool-group"><span class="muted" data-i18n="m.metric"></span><div class="seg" id="mMetric"></div></div>
+          <div class="tool-group"><span class="muted" data-i18n="m.order"></span><div class="seg" id="mOrder"></div></div>
+          <div class="tool-group"><span class="muted" data-i18n="m.min"></span><input class="num-input num" id="mMin" type="text" inputmode="decimal" dir="ltr" placeholder="—"><span class="muted" id="mMinUnit"></span></div>
+          <span class="toolbar-note" id="mCount"></span>
+        </div>
+        <div class="note" data-i18n="m.note"></div>
+        <div class="card flush"><div class="table-wrap" id="mTable"></div></div>
+      </section>
+
+      <!-- ================= LIVE ================= -->
+      <section class="page hidden" id="page-live">
+        <div class="toolbar">
+          <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="liveSearch" data-i18n-ph="search"></div>
+          <div class="seg" id="liveView"><button data-v="apps" data-i18n="view.apps"></button><button data-v="details" data-i18n="view.details"></button></div>
+          <button class="btn danger" id="btnEndTask" disabled><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg><span data-i18n="pa.endTask"></span></button>
+          <div class="toolbar-note" id="liveNote"></div>
+        </div>
+        <div class="card flush"><div class="table-wrap" id="liveTable"></div></div>
+      </section>
+
+      <!-- ================= PROCESSES ================= -->
+      <section class="page hidden" id="page-processes">
+        <div class="toolbar">
+          <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="procSearch" data-i18n-ph="search"></div>
+          <div class="toolbar-note" data-i18n="proc.note"></div>
+        </div>
+        <div class="card flush"><div class="table-wrap" id="procTable"></div></div>
+      </section>
+
+      <!-- ================= INSIGHTS ================= -->
+      <section class="page hidden" id="page-insights">
+        <div class="insight-grid" id="insights"></div>
+      </section>
+
+      <!-- ================= STARTUP APPS ================= -->
+      <section class="page hidden" id="page-startup">
+        <div class="toolbar"><div class="note" style="margin:0" data-i18n="su.note"></div><span class="toolbar-note" id="suCount"></span></div>
+        <div class="card flush"><div class="table-wrap" id="suTable"></div></div>
+      </section>
+
+      <!-- ================= SERVICES ================= -->
+      <section class="page hidden" id="page-services">
+        <div class="toolbar">
+          <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="svSearch" data-i18n-ph="search"></div>
+          <div class="seg" id="svFilter"><button data-v="all" data-i18n="sv.all"></button><button data-v="running" data-i18n="sv.running"></button><button data-v="stopped" data-i18n="sv.stopped"></button></div>
+          <span class="toolbar-note" id="svCount"></span>
+        </div>
+        <div id="svAdmin"></div>
+        <div class="card flush"><div class="table-wrap" id="svTable"></div></div>
+      </section>
+
+      <!-- ================= ADD-ON PAGES (filled by network.js / rules.js / counters.js) ================= -->
+      <section class="page hidden" id="page-network"></section>
+      <section class="page hidden" id="page-rules"></section>
+      <section class="page hidden" id="page-counters"></section>
+
+      <!-- ================= SETTINGS ================= -->
+      <section class="page hidden" id="page-settings">
+        <div class="settings" id="settings"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- Side drawer: application / process / moment details -->
+<div class="scrim hidden" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <div class="drawer-title" id="drTitle"></div>
+    <div class="drawer-actions" id="drActions"></div>
+    <button class="icon-btn" id="drClose" aria-label="close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+  </div>
+  <div class="drawer-body" id="drBody"></div>
+</aside>
+
+<div class="toast hidden" id="toast"></div>
+<div class="ctx hidden" id="ctx"></div>
+<div class="modal-scrim hidden" id="modal"><div class="modal" role="dialog"><h3 id="mdTitle"></h3><p id="mdBody"></p><div class="btn-row" id="mdBtns"></div></div></div>
+
+<script src="vendor/echarts.min.js"></script>
+<script src="i18n.js"></script>
+<script src="i18n-v3.js"></script>
+<script src="app.js"></script>
+<script src="network.js"></script>
+<script src="rules.js"></script>
+<script src="counters.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# Build output (re-created by build-setup.cmd / dotnet build)
+bin/
+obj/
+publish/
+dist/
+setup/bin/
+setup/obj/
+
+# Editors and tools
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Local data that must never be committed
+*.db
+*.db-wal
+*.db-shm
+errors.log

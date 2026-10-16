@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ResourceLens-Setup.exe: a single file to send to anyone. It targets .NET Framework 4.8, which ships with
+    Windows 10/11, so it needs nothing installed; the app itself (self-contained, trimmed) travels inside it
+    compressed. Built by build-setup.ps1, which passes the compressed app as PayloadPath.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>ResourceLens-Setup</AssemblyName>
+    <RootNamespace>ResourceLensSetup</RootNamespace>
+    <ApplicationIcon>..\assets\app.ico</ApplicationIcon>
+    <ApplicationManifest>setup.manifest</ApplicationManifest>
+    <Product>ResourceLens</Product>
+    <Description>ResourceLens Setup</Description>
+    <Copyright>ResourceLens</Copyright>
+    <DebugType>none</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <PayloadPath Condition="'$(PayloadPath)' == ''">$(MSBuildThisFileDirectory)..\dist\payload\ResourceLens.exe.gz</PayloadPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="$(PayloadPath)" LogicalName="payload.gz" />
+    <EmbeddedResource Include="..\assets\app.ico" LogicalName="app.ico" />
+    <Reference Include="System.Management" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,85 @@
+/* ---------- Network page (network.js) ---------- */
+#page-network .net-admin { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 0; }
+#page-network .net-admin .btn { flex: none; }
+
+/* meters: four equal cards, the last line of each (spark or cap bar) lines up */
+#page-network .net-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#page-network .net-kpis .kpi { min-height: 132px; }
+#page-network .net-capbar { margin-top: auto; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; min-height: 42px; justify-content: flex-end; }
+#page-network .net-capbar .bar { width: 100%; height: 6px; }
+@media (max-width: 1180px) { #page-network .net-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* connections */
+#page-network .net-conn-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+#page-network .net-conn-head h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text-2); margin-inline-end: 4px; }
+#page-network .net-conn-head .search { width: 260px; height: 34px; }
+#page-network .net-count { margin-inline-start: auto; }
+#page-network .net-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); cursor: pointer; white-space: nowrap; }
+#page-network .net-conn .table-wrap { max-height: 430px; }
+/* fixed layout: the columns share the card's width at any window size instead of scrolling sideways */
+#page-network .net-table { table-layout: fixed; }
+#page-network .net-table col.nc-name { width: 21%; }
+#page-network .net-table col.nc-proto { width: 9%; }
+#page-network .net-table col.nc-local, #page-network .net-table col.nc-remote { width: 18%; }
+#page-network .net-table col.nc-host { width: 21%; }
+#page-network .net-table col.nc-state { width: 13%; }
+#page-network .net-table th, #page-network .net-table td { padding-inline: 10px; overflow: hidden; text-overflow: ellipsis; }
+#page-network .net-table td { font-size: 12px; }
+#page-network .net-table td > .num, #page-network .net-table td > span { display: block; overflow: hidden; text-overflow: ellipsis; }
+#page-network .net-table tbody tr { cursor: default; }
+#page-network .net-table tr.net-grp td { border-top: 1px solid var(--border-strong); }
+#page-network .net-table .icon-cell { min-width: 0; }
+#page-network .net-table .icon-cell > div { min-width: 0; }
+#page-network .net-table .icon-cell b, #page-network .net-table .icon-cell span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#page-network .net-table .st-badge { display: inline-flex; }
+#page-network .net-host { direction: ltr; unicode-bidi: isolate; }
+/* addresses read left-to-right but line up with their right-aligned headers in Arabic */
+[dir="rtl"] #page-network .net-table td > .num, [dir="rtl"] #page-network .net-host { text-align: right; }
+
+/* two-column rows below the table */
+#page-network .net-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+#page-network .net-grid:empty { display: none; }
+#page-network .net-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+#page-network .net-card { display: flex; flex-direction: column; }
+#page-network .net-card .card-head { min-height: 32px; flex-wrap: wrap; }
+#page-network .net-col > .net-card:last-child { flex: 1; }
+@media (max-width: 1280px) { #page-network .net-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* usage by app */
+#page-network .net-period { font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
+#page-network .net-usage { max-height: 360px; margin: 8px -18px -16px; border-top: 1px solid var(--border); }
+#page-network .net-usage tbody tr { cursor: default; }
+#page-network .net-usage table { table-layout: fixed; }
+#page-network .net-usage col.nu-app { width: 40%; }
+#page-network .net-usage col.nu-n { width: 17%; }
+#page-network .net-usage col.nu-total { width: 26%; }
+#page-network .net-usage th, #page-network .net-usage td { padding-inline: 10px; overflow: hidden; text-overflow: ellipsis; }
+#page-network .net-usage th:first-child, #page-network .net-usage td:first-child { padding-inline-start: 18px; }
+#page-network .net-usage th:last-child, #page-network .net-usage td:last-child { padding-inline-end: 18px; }
+#page-network .net-usage .icon-cell { min-width: 0; }
+#page-network .net-usage .icon-cell > div { min-width: 0; }
+#page-network .net-usage .icon-cell b, #page-network .net-usage .icon-cell span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#page-network .net-split { width: 56px; }
+#page-network ::-webkit-scrollbar-corner { background: transparent; }
+#page-network .net-split > i { background: linear-gradient(to right, var(--c-net-rx) var(--rx), var(--c-net-tx) var(--rx)); }
+[dir="rtl"] #page-network .net-split > i { background: linear-gradient(to left, var(--c-net-rx) var(--rx), var(--c-net-tx) var(--rx)); }
+#page-network .net-daily { flex: 1; height: auto; min-height: 300px; cursor: default; }
+
+/* activity + blocked lists */
+#page-network .net-lead { font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+#page-network .net-list { display: flex; flex-direction: column; max-height: 420px; overflow: auto; margin: 0 -6px; }
+#page-network .net-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 6px; border-top: 1px solid var(--border); }
+#page-network .net-item:first-child { border-top: 0; }
+#page-network .net-item .icon-cell { min-width: 0; flex: 1; }
+#page-network .net-item .icon-cell > div { min-width: 0; }
+#page-network .net-item .icon-cell b, #page-network .net-item .icon-cell span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: none; }
+#page-network .net-item .mini-btn { flex: none; }
+#page-network .net-path { direction: ltr; unicode-bidi: isolate; text-align: left; font-size: 11px; }
+[dir="rtl"] #page-network .net-path { text-align: right; } /* reads left-to-right, lines up under the name */
+#page-network .net-empty { padding: 22px 10px; }
+#page-network .net-ev-ic svg { width: 13px; height: 13px; color: var(--accent-2); }
+#page-network .mini-btn.net-danger { color: #f87171; }
+#page-network .mini-btn.net-danger:hover { border-color: var(--bad); }
+
+/* settings card */
+#page-network .net-cap-input { display: flex; align-items: center; gap: 8px; flex: none; }
