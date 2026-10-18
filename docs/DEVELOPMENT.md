@@ -28,7 +28,7 @@ For day-to-day work, `dotnet build` produces a Debug build in `bin\Debug`.
 | `--check=… --shots --check-size=1440x900` | Same, plus a picture of every page at a fixed window size. The README screenshots are made this way. |
 | `--selftest` | Compares the native readers (processes, memory, CPU) with .NET's own APIs. |
 | `--bench` | Measures the cost of each sampling component. |
-| `--probe-sensors` | Lists the available sensor sources and two readings. |
+| `--probe-sensors` | Lists the sensor sources and GPU adapters found, with three readings, in `%TEMP%\resourcelens-sensors.txt`. |
 | `--selftest-admin` | Tests per-process network (ETW) and the elevated logon task; needs administrator rights. |
 | `--exit` | Asks the running copy to shut down cleanly (used by the installer). |
 | `--uninstall [--quiet]` | What *Installed apps* runs. |
@@ -38,6 +38,24 @@ Reports are written to `%TEMP%`.
 
 `RESOURCELENS_DATADIR=<folder>` makes a run use its own data folder and its own single-instance scope. Such a test run
 never touches the installed copy's autostart entry.
+
+`RESOURCELENS_TEST_SENSORS` (Debug builds only) simulates other hardware: `basic` skips the vendor libraries (AMD ADL,
+Lenovo WMI), which is what a typical Intel or NVIDIA PC has; `none` disables sensors entirely, as in a virtual machine.
+Combine it with `--check` to see how every page behaves without those readings.
+
+## Hardware notes
+
+- Usage data comes from documented Windows interfaces (`NtQuerySystemInformation`, PDH counters with English names,
+  ETW), so it does not depend on the hardware vendor or the Windows display language.
+- GPUs are enumerated through D3DKMT, which gives each adapter's LUID; the PDH `GPU Engine` and `GPU Adapter Memory`
+  instances carry the same LUID, which is how utilization, memory and temperature are matched per GPU. Compute-only
+  adapters (NPUs), virtual displays and the Basic Render Driver are skipped.
+- Temperatures: AMD ADL (Radeon GPUs and Ryzen APUs), D3DKMT adapter performance data (any GPU whose WDDM 2.4+ driver
+  reports it), Lenovo GameZone WMI (administrator), and ACPI thermal zones as the last resort for the CPU. Accurate
+  per-core CPU temperatures would need a kernel driver, which the project deliberately avoids.
+- NVIDIA's NVML is not used: polling it keeps a laptop's discrete GPU awake, and D3DKMT already provides its
+  temperature and clocks.
+- The app is x64 only. On Windows 11 on ARM it runs under emulation (untested); the installer refuses Windows 10 on ARM.
 
 > **Running from inside another app:** an app packaged with MSIX (for example the Claude desktop app, or a Store
 > messaging app) redirects `%LOCALAPPDATA%` writes from programs it starts into its own private storage. ResourceLens

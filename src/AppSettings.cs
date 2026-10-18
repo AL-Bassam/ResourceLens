@@ -70,7 +70,9 @@ public sealed class AppSettings
     /// <summary>Animated (smooth) wheel scrolling in the dashboard. Off = the page follows the wheel instantly.</summary>
     public bool SmoothScrolling { get; set; } = false;
 
-    public string Language { get; set; } = "ar";
+    public string Language { get; set; } = DefaultLanguage;
+    /// <summary>Arabic on Arabic Windows, English otherwise (the installer sets the same on first install).</summary>
+    static string DefaultLanguage => System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ar" ? "ar" : "en";
     public string Theme { get; set; } = "dark";
 
     /// <summary>History/settings folder. RESOURCELENS_DATADIR overrides it (used for side-by-side test runs).</summary>
@@ -107,7 +109,7 @@ public sealed class AppSettings
         OverlayItems = (OverlayItems ?? new()).Where(i => OverlayWindow.AllItems.Contains(i)).Distinct().ToList();
         OverlayOpacity = Math.Clamp(OverlayOpacity, 0, 100);
         OverlayScale = Math.Clamp(OverlayScale, 60, 200);
-        if (Language is not ("ar" or "en")) Language = "ar";
+        if (Language is not ("ar" or "en")) Language = DefaultLanguage;
         if (Theme is not ("dark" or "light" or "system")) Theme = "dark";
     }
 

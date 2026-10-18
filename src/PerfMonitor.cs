@@ -158,24 +158,39 @@ internal sealed unsafe class PerfMonitor : IDisposable
             nets.Add(new { n.Name, n.Description, n.Type, n.SpeedBps, n.IPv4, n.IPv6, rx = r, tx = t, key });
         }
 
-        // ---- GPU ----
-        var engines = new Dictionary<string, double>();
-        foreach (var (name, v) in Many(_gpuEng))
-        {
-            int ei = name.IndexOf("engtype_", StringComparison.Ordinal);
-            string eng = ei >= 0 ? name[(ei + 8)..] : "?";
-            engines[eng] = engines.GetValueOrDefault(eng) + Math.Max(0, v);
-        }
-        double gpuUtil = engines.Count == 0 ? 0 : Cap(engines.Values.Max());
-        Push("gpu", gpuUtil);
+        // ---- GPU (one entry per adapter, like Task Manager's GPU 0, GPU 1…) ----
+        var load = GpuLoad.From(Many(_gpuEng));
+        Push("gpu", load.Total);
         Push("gpuTemp", sens?.GpuTemp);
         Push("gpuMhz", sens?.GpuMhz);
-        foreach (var e in engines) Push("gpuE:" + e.Key, Cap(e.Value));
-        var gpus = HardwareInfo.Gpus().Select(g => new
+        var gpuInfo = HardwareInfo.Gpus();
+        var gpus = new List<object>();
+        for (int i = 0; i < gpuInfo.Count; i++)
         {
-            g.Name, g.Driver, g.DriverDate, dedicatedTotal = g.DedicatedBytes, sharedTotal = g.SharedBytes,
-            dedicatedUsed = sens?.GpuDedicatedUsed, sharedUsed = sens?.GpuSharedUsed,
-        }).ToList();
+            var g = gpuInfo[i];
+            // Without LUIDs (old drivers) everything belongs to the only adapter there is.
+            var l = g.Luid is null ? (gpuInfo.Count == 1 ? new GpuLoad.Adapter { Util = load.Total } : null) : load.ByAdapter.GetValueOrDefault(g.Luid);
+            var types = g.Luid is null && gpuInfo.Count == 1 ? load.ByType : l?.ByType ?? new();
+            var sg = g.Luid is null ? null : sens?.Gpus?.FirstOrDefault(x => x.Luid == g.Luid);
+            // With one GPU, the system-wide readings describe it (they fill in what its own entry lacks).
+            var only = gpuInfo.Count == 1 ? sens : null;
+            string key = $"gpu{i}";
+            double util = l?.Util ?? 0;
+            double? temp = sg?.Temp ?? only?.GpuTemp;
+            Push(key, util);
+            Push(key + "T", temp);
+            foreach (var (type, v) in types) Push($"{key}E:{type}", v);
+            gpus.Add(new
+            {
+                key, g.Name, g.Driver, g.DriverDate, luid = g.Luid,
+                util = Math.Round(util, 1),
+                engines = types.ToDictionary(k => k.Key, v => Math.Round(v.Value, 1)),
+                dedicatedTotal = g.DedicatedBytes, sharedTotal = g.SharedBytes,
+                dedicatedUsed = sg?.DedicatedUsed ?? only?.GpuDedicatedUsed, sharedUsed = sg?.SharedUsed ?? only?.GpuSharedUsed,
+                temp, hotspot = sg?.Hotspot ?? only?.GpuHotspot,
+                coreMhz = sg?.CoreMhz ?? only?.GpuMhz, memMhz = sg?.MemMhz ?? only?.GpuMemMhz, power = sg?.Power ?? only?.GpuPower,
+            });
+        }
 
         _last = new
         {
@@ -200,7 +215,8 @@ internal sealed unsafe class PerfMonitor : IDisposable
             },
             disks,
             nets,
-            gpu = new { util = Math.Round(gpuUtil, 1), engines = engines.ToDictionary(k => k.Key, v => Math.Round(Cap(v.Value), 1)), adapters = gpus },
+            gpu = new { util = Math.Round(load.Total, 1), adapters = gpus },
+            isLenovo = HardwareInfo.IsLenovo,
         };
         _lastAt = DateTime.UtcNow;
         return _last;

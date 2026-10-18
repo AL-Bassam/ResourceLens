@@ -32,6 +32,12 @@ internal static class Program
             if (!Has("--silent")) MessageBox.Show(Strings.NeedsWin10, "ResourceLens", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 2;
         }
+        if (IsArm64() && Environment.OSVersion.Version.Build < 22000)
+        {
+            // The app is x64: Windows on ARM runs x64 programs only from Windows 11 on.
+            if (!Has("--silent")) MessageBox.Show(Strings.NeedsWin11Arm, "ResourceLens", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return 2;
+        }
         if (Has("--silent"))
         {
             try
@@ -59,6 +65,16 @@ internal static class Program
             };
         Application.Run(form);
         return 0;
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern bool IsWow64Process2(IntPtr process, out ushort processMachine, out ushort nativeMachine);
+
+    /// <summary>An ARM64 PC (asked of Windows itself: an emulated process is told it runs on x64).</summary>
+    static bool IsArm64()
+    {
+        try { return IsWow64Process2((IntPtr)(-1), out _, out ushort native) && native == 0xAA64; }
+        catch (EntryPointNotFoundException) { return false; } // Windows 10 before 1709 never runs on ARM64
     }
 }
 
@@ -100,4 +116,5 @@ internal static class Strings
     public static string NoWebView2 => T("يحتاج ResourceLens إلى مكوّن Microsoft Edge WebView2 لعرض الواجهة، وهو غير موجود على هذا الجهاز. هل تريد فتح صفحة تنزيله؟ (سيستمر التثبيت والتسجيل يعمل)",
         "ResourceLens needs the Microsoft Edge WebView2 Runtime for its window, and it is missing on this PC. Open its download page? (Setup continues; recording works without it)");
     public static string NeedsWin10 => T("يتطلب ResourceLens نظام Windows 10 أو 11 بإصدار 64 بت.", "ResourceLens requires 64-bit Windows 10 or 11.");
+    public static string NeedsWin11Arm => T("على الأجهزة بمعالجات ARM يتطلب ResourceLens نظام Windows 11.", "On ARM-based PCs, ResourceLens requires Windows 11.");
 }

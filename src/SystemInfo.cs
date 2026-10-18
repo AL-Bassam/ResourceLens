@@ -21,30 +21,9 @@ internal static class SystemInfo
         var ms = new Native.MEMORYSTATUSEX { dwLength = (uint)System.Runtime.InteropServices.Marshal.SizeOf<Native.MEMORYSTATUSEX>() };
         Native.GlobalMemoryStatusEx(ref ms);
 
-        var gpus = new List<object>();
-        try
-        {
-            using var cls = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}");
-            foreach (var sub in cls?.GetSubKeyNames() ?? Array.Empty<string>())
-            {
-                if (!sub.All(char.IsDigit)) continue;
-                using var k = cls!.OpenSubKey(sub);
-                string? name = k?.GetValue("DriverDesc") as string;
-                if (string.IsNullOrWhiteSpace(name) || name.Contains("Basic Display", StringComparison.OrdinalIgnoreCase)) continue;
-                long? vram = k?.GetValue("HardwareInformation.qwMemorySize") switch
-                {
-                    long l => l,
-                    byte[] bytes when bytes.Length >= 8 => BitConverter.ToInt64(bytes),
-                    byte[] bytes when bytes.Length >= 4 => BitConverter.ToUInt32(bytes),
-                    int i => (uint)i,
-                    _ => null,
-                };
-                if (vram is null && k?.GetValue("HardwareInformation.MemorySize") is { } mem)
-                    vram = mem switch { int i => (uint)i, byte[] bytes when bytes.Length >= 4 => BitConverter.ToUInt32(bytes), _ => null };
-                gpus.Add(new { name, dedicated_vram_mb = vram is > 0 ? vram / 1048576 : null, driver = k?.GetValue("DriverVersion") as string });
-            }
-        }
-        catch { }
+        var gpus = HardwareInfo.Gpus()
+            .Select(g => new { name = g.Name, dedicated_vram_mb = g.DedicatedBytes is > 0 ? g.DedicatedBytes / 1048576 : null, driver = g.Driver })
+            .ToList();
 
         object? disk = null;
         try

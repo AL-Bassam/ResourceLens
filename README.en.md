@@ -1,133 +1,119 @@
 <div align="center">
 
-<img src="assets/app.png" width="96" alt="ResourceLens">
+<img src="assets/app.png" width="80" alt="">
 
 # ResourceLens
 
-**A complete history of your PC's resource use since it was switched on: CPU, memory, disk, network, GPU and temperatures, for every app and every process inside it.**
+Resource usage history for Windows: CPU, memory, disk, network, GPU and temperatures, per application and per process.
 
-[العربية](README.md) · [Download](https://github.com/AL-Bassam/ResourceLens/releases/latest) · [License: MIT](LICENSE)
-
-<img src="docs/screenshots/en/overview.png" alt="Overview" width="900">
+[Download](https://github.com/AL-Bassam/ResourceLens/releases/latest) · [العربية](README.md) · [MIT License](LICENSE)
 
 </div>
 
-## Why ResourceLens?
+<img src="docs/screenshots/en/overview.png" alt="ResourceLens overview page">
 
-Task Manager only shows what is happening **right now**. If your PC slowed down an hour ago, memory filled up during a game, or temperatures spiked overnight, you will never know what caused it.
+Task Manager shows what is happening now. ResourceLens records a snapshot of the system every few seconds and keeps the history, so you can return to any point since the PC was started and see what was using the CPU, memory, disk, network or GPU at that time, and which window was in the foreground.
 
-ResourceLens runs quietly next to the clock, takes a snapshot of the system every few seconds and keeps it. Later you can go back to any moment and see:
-- exactly how much was used;
-- which app was responsible, down to the process inside the app: which browser tab, which service inside `svchost`, which script `python` is running;
-- what window you had in front of you at the time.
-
-It is light enough to leave running next to games.
+It runs in the notification area. While recording in the background it uses about 0.03% CPU and less than 50 MB of memory.
 
 ## Features
 
-- **History since boot:** CPU, memory, disk, network, GPU, temperatures and clock speeds, for the whole system and for every app.
-- **Moments:** every recorded snapshot with its real values, the active window, and the processes responsible at that exact moment.
-- **Interactive charts:** drag to zoom into a period, click any point to open its details, and pick the time span: the whole period, 1 hour, 30 minutes and more.
-- **Insights:** peak moments and their causes, memory-leak detection, and past alerts.
-- **A Task Manager replacement:** a live performance page, end task and priority, plus startup apps and services.
-- **Network monitor**, GlassWire-style: today's and this month's usage, live connections per app, an alert when an app connects for the first time, and one-click firewall blocking.
-- **Process control**, Process Lasso-style:
-  - permanent per-app rules: priority, CPU affinity, efficiency mode, and the power plan while gaming;
-  - an optional ProBalance that keeps the app you are using responsive.
-- **Performance counters**, Performance Monitor-style: any Windows counter on a live chart, with optional recording.
-- **Gaming overlay:** a click-through corner panel with the values you pick, toggled with `Ctrl+Shift+O`.
-- **Export for AI:** a self-describing JSON file you can give to ChatGPT, Claude or Gemini to analyse your PC's usage. CSV export is available too.
-- **Arabic and English**, dark and light themes, and any page you don't need can be hidden.
-- **Robust:**
-  - the history file repairs itself if it is ever damaged, and keeps a copy of the damaged file;
-  - the app restarts itself if recording gets stuck;
-  - all data stays on your PC.
+- Continuous recording of system-wide and per-application usage: CPU, memory, disk I/O, network, GPU, temperatures and clock speeds.
+- Per-process detail within each application, such as individual browser processes, the services hosted by each `svchost.exe` and the script run by `python.exe`.
+- A list of every recorded snapshot with its values, the foreground window and the processes responsible.
+- Interactive charts with zoom and selectable time ranges.
+- Insights: peak periods and their causes, steady memory growth (possible leaks) and alerts.
+- Task Manager functions: a real-time Performance page with each GPU listed separately, end task, process priority, startup applications and services.
+- Network monitor: data usage per day and per month, active connections per application, an alert when an application connects for the first time, and blocking through Windows Firewall.
+- Process rules: priority, CPU affinity, efficiency mode and power plan per application, with optional automatic priority balancing.
+- Performance counters: chart any Windows performance counter and optionally record it.
+- An in-game overlay showing selected values, toggled with `Ctrl+Shift+O`.
+- Export to CSV, or to a self-describing JSON file intended for analysis with an AI assistant.
+- Arabic and English interface, light and dark themes.
 
 ## Screenshots
 
 | | |
 |---|---|
 | <img src="docs/screenshots/en/overview-charts.png" alt="Charts"> | <img src="docs/screenshots/en/moments.png" alt="Moments"> |
-| **Charts:** usage since boot; click any point to see what happened | **Moments:** every snapshot with the active window and the culprits |
+| Usage since boot. Selecting a point opens that moment. | Recorded snapshots with the foreground window and top processes. |
 | <img src="docs/screenshots/en/insights.png" alt="Insights"> | <img src="docs/screenshots/en/processes.png" alt="Process history"> |
-| **Insights:** peak moments and the processes behind them | **Process history:** each app's average, peak and growth over the period |
-| <img src="docs/screenshots/en/perf.png" alt="Performance"> | <img src="docs/screenshots/en/live.png" alt="Processes right now"> |
-| **Performance:** every core, memory, disks, network adapters, GPU | **Processes right now:** with end task and priority |
+| Peak periods and the processes behind them. | Average, peak and growth of each application over a period. |
+| <img src="docs/screenshots/en/perf.png" alt="Performance"> | <img src="docs/screenshots/en/live.png" alt="Processes"> |
+| CPU cores, memory, disks, network adapters and GPUs, updated every second. | Running processes, with end task and priority. |
 | <img src="docs/screenshots/en/network.png" alt="Network"> | <img src="docs/screenshots/en/rules.png" alt="Process control"> |
-| **Network:** usage and live connections | **Process control:** rules and ProBalance |
-| <img src="docs/screenshots/en/counters.png" alt="Counters"> | <img src="docs/screenshots/en/settings.png" alt="Settings"> |
-| **Counters:** any Windows performance counter | **Settings:** interval, retention and what gets recorded |
+| Network usage and active connections. | Per-application rules and priority balancing. |
+| <img src="docs/screenshots/en/counters.png" alt="Performance counters"> | <img src="docs/screenshots/en/overview-dark.png" alt="Dark theme"> |
+| Windows performance counters. | Dark theme. |
 
-<img src="docs/screenshots/en/overlay.png" alt="Gaming overlay" width="240"> **The gaming overlay**
+<img src="docs/screenshots/en/overlay.png" alt="In-game overlay" width="232">
 
-## Download and install
+In-game overlay (`Ctrl+Shift+O`).
 
-1. Download **`ResourceLens-Setup.exe`** (about 19 MB) from the [Releases page](https://github.com/AL-Bassam/ResourceLens/releases/latest).
-2. Double-click it and press **Install**. It needs no administrator rights and no .NET install.
-3. ResourceLens starts next to the clock, begins recording right away, and starts with Windows from then on.
+## Installation
 
-> **Windows SmartScreen:** ResourceLens is free and not signed with a commercial certificate, so Windows may show "Windows protected your PC" the first time. Click **More info**, then **Run anyway**.
->
-> To check that your file is the one published here, run `Get-FileHash .\ResourceLens-Setup.exe` in PowerShell and compare the result with the SHA-256 on the release page.
+1. Download `ResourceLens-Setup.exe` (about 19 MB) from the [latest release](https://github.com/AL-Bassam/ResourceLens/releases/latest).
+2. Run it and select **Install**. Administrator rights and a separate .NET installation are not required.
 
-**Requirements:**
-- 64-bit Windows 10 or 11.
-- The Microsoft Edge WebView2 Runtime: built into Windows 11 and present on most Windows 10 PCs.
+ResourceLens starts in the notification area and, by default, starts with Windows. Running a newer setup file updates the installation and keeps the recorded history and settings. To uninstall, open **Settings › Apps › Installed apps**; you can choose whether to keep the history.
 
-**Uninstall:** from *Installed apps* in Windows Settings, with the choice to keep or delete your history.
+The setup file is not code-signed, so Windows SmartScreen may show a warning the first time it runs. Select **More info**, then **Run anyway**. Each release page lists the file's SHA-256 checksum, which you can compare with the output of `Get-FileHash .\ResourceLens-Setup.exe` in PowerShell.
 
-**Update:** run a newer setup file; your history and settings are kept.
+## Requirements
 
-The interface follows the setup language: Arabic on Arabic Windows, English otherwise. You can switch it at any time from the top bar. Windows' own process descriptions appear in your Windows display language.
+- Windows 10 or Windows 11, 64-bit.
+- Microsoft Edge WebView2 Runtime. It is included in Windows 11 and in up-to-date Windows 10 installations; if it is missing, the setup offers the download page.
+
+ResourceLens is developed and tested on Windows 11. The following are not supported:
+
+- macOS and Linux. ResourceLens is built on Windows-specific interfaces. On a Mac it runs only under Windows: Boot Camp on Intel-based Macs, or a Windows 11 virtual machine on Apple silicon (where hardware sensors are not available).
+- 32-bit Windows, and Windows 10 on ARM. Windows 11 on ARM runs ResourceLens through x64 emulation; this has not been tested.
+- Windows in S mode, and PCs where Smart App Control blocks applications that are not code-signed.
+
+## Hardware support
+
+Usage data (CPU, memory, disk, network, GPU utilization and everything per process) comes from standard Windows interfaces and works on any PC. Temperature, clock and fan readings depend on what the hardware and its drivers report:
+
+| Hardware | Available readings |
+|---|---|
+| AMD Ryzen processors with integrated Radeon graphics | CPU, GPU and SoC temperature, clock speeds, power (AMD Display Library) |
+| AMD Radeon graphics cards | GPU temperature, hotspot, clock speeds, power, fan speed |
+| NVIDIA GeForce and other graphics cards | GPU temperature and clock speeds, as reported by the driver to Windows (the values Task Manager shows) |
+| Laptops with integrated and discrete graphics | Each GPU is shown separately; the recorded GPU temperature is the discrete GPU's |
+| Intel processors, and AMD processors without integrated Radeon graphics | CPU temperature only if the firmware provides ACPI thermal zones. This value is often approximate and many desktop PCs do not provide it |
+| Lenovo Legion devices | CPU and GPU temperature and fan speeds from the embedded controller, when running as administrator |
+| Virtual machines | Usage data only |
+
+Reading the exact core temperature of every processor requires a kernel-mode driver. ResourceLens does not install one.
+
+## Administrator rights
+
+ResourceLens runs as a standard user. The following features need administrator rights, which can be enabled under **Settings › Run as administrator** (Windows asks once):
+
+- per-application network usage;
+- blocking applications in Windows Firewall;
+- starting and stopping services;
+- Lenovo fan and temperature sensors.
 
 ## Privacy
 
-- Everything ResourceLens records stays on your PC in `%LOCALAPPDATA%\ResourceLens` and is never sent anywhere.
-- There is no telemetry and no usage tracking.
-- Export files (JSON or CSV) are created only when you ask for them, and saved where you choose.
-- Window titles are recorded so you can see what was in front of you; you can turn this off in Settings.
+- All data is stored on the PC, in `%LOCALAPPDATA%\ResourceLens`. ResourceLens does not send data anywhere and contains no telemetry.
+- The title of the foreground window is recorded. This can be turned off in Settings.
+- Process command lines are stored to identify processes. Values that look like passwords or access tokens are masked.
+- Export files are created only on request and saved where you choose.
 
-## FAQ
+## Disk space
 
-<details><summary><b>Does it slow down my PC or games?</b></summary>
-
-No. In the background it uses about 0.03% of the CPU and under 50 MB of memory, runs at low priority and in Windows 11 efficiency mode. When its window is minimized, the interface stops rendering completely.
-</details>
-
-<details><summary><b>Why does it suggest running as administrator?</b></summary>
-
-A few things need administrator rights:
-- per-app network usage;
-- blocking apps in the firewall;
-- starting and stopping services;
-- some sensors, such as fan speeds on Lenovo PCs.
-
-Everything else works without it. You can enable *Run as administrator* in Settings; Windows asks for permission once.
-</details>
-
-<details><summary><b>How much disk space does the history take?</b></summary>
-
-About 4 MB per thousand snapshots. At the default interval (one snapshot every 5 seconds) that is roughly 65 MB per full day of use during the full-resolution days. After that, snapshots are merged into one-minute averages and take far less space. You control the interval and retention in Settings.
-</details>
-
-<details><summary><b>My antivirus flagged the file</b></summary>
-
-ResourceLens reads processes and can end them, and it controls services and the firewall. Some antivirus products treat those actions as suspicious, and the file is not code-signed, which makes a warning more likely. All of the code is here for anyone to review or build themselves.
-</details>
-
-<details><summary><b>Are temperatures available on every PC?</b></summary>
-
-It depends on the hardware:
-- **AMD CPUs and GPUs:** the most accurate readings, through the AMD Display Library.
-- **All modern GPUs:** temperature through the Windows graphics interface.
-- **Lenovo Legion devices:** fan speeds as well.
-- **Intel CPUs:** approximate readings, through the system's ACPI thermal zones.
-</details>
+The history uses about 4 MB per 1,000 snapshots. At the default interval of 5 seconds, that is about 65 MB per day of use. After the full-resolution period, snapshots are merged into one-minute averages, which take much less space. The interval, the full-resolution period and the retention period can be changed in Settings.
 
 ## Building from source
 
-Requires the .NET 10 SDK. Double-click `build-setup.cmd`; it builds the app and the installer into `dist\ResourceLens-Setup.exe`. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for details.
+Install the [.NET 10 SDK](https://dotnet.microsoft.com/download) and run `build-setup.cmd`. It builds the application and the installer into `dist\ResourceLens-Setup.exe`. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the project layout and test options.
+
+## Feedback
+
+Bug reports and suggestions are welcome in [Issues](https://github.com/AL-Bassam/ResourceLens/issues).
 
 ## License
 
-[MIT](LICENSE): free to use, modify and distribute with attribution. Bundled libraries and their licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+[MIT](LICENSE). Third-party components and their licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

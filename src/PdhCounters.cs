@@ -103,39 +103,17 @@ internal sealed class PdhCounters : IDisposable
         {
             st = Native.PdhGetFormattedCounterArrayW(_gpu, Native.PDH_FMT_DOUBLE | Native.PDH_FMT_NOCAP100, ref size, out count, buf);
             if (st != 0) return;
-
-            // Task Manager semantics: a process' GPU% is the busiest engine type it uses;
-            // the system GPU% is the busiest engine type overall.
-            var perPidEngine = new Dictionary<(uint pid, string eng), double>();
-            var perEngine = new Dictionary<string, double>();
+            var list = new List<(string, double)>((int)count);
             var items = (Native.PDH_FMT_COUNTERVALUE_ITEM*)buf;
             for (int i = 0; i < count; i++)
             {
-                if (items[i].FmtValue.CStatus != 0) continue;
-                double val = items[i].FmtValue.doubleValue;
-                if (val <= 0) continue;
-                string? name = Marshal.PtrToStringUni(items[i].szName);
-                if (name is null) continue;
-                // pid_1234_luid_0x00000000_0x0000C3B1_phys_0_eng_0_engtype_3D
-                uint pid = 0;
-                int pi = name.IndexOf("pid_", StringComparison.Ordinal);
-                if (pi >= 0)
-                {
-                    int e = name.IndexOf('_', pi + 4);
-                    if (e > pi) uint.TryParse(name.AsSpan(pi + 4, e - pi - 4), out pid);
-                }
-                int ei = name.IndexOf("engtype_", StringComparison.Ordinal);
-                string eng = ei >= 0 ? name[(ei + 8)..] : "?";
-                var key = (pid, eng);
-                perPidEngine[key] = perPidEngine.GetValueOrDefault(key) + val;
-                perEngine[eng] = perEngine.GetValueOrDefault(eng) + val;
+                if (items[i].FmtValue.CStatus != 0 || items[i].FmtValue.doubleValue <= 0) continue;
+                if (Marshal.PtrToStringUni(items[i].szName) is { } name) list.Add((name, items[i].FmtValue.doubleValue));
             }
-            var byPid = new Dictionary<uint, double>();
-            foreach (var (k, val) in perPidEngine)
-                byPid[k.pid] = Math.Max(byPid.GetValueOrDefault(k.pid), Math.Min(100, val));
-            r.GpuByPid = byPid;
-            r.GpuTotal = perEngine.Count == 0 ? 0 : Math.Min(100, perEngine.Values.Max());
-            r.GpuEngines = perEngine.ToDictionary(k => k.Key, v => Math.Round(Math.Min(100, v.Value), 1));
+            var load = GpuLoad.From(list);
+            r.GpuByPid = load.ByPid;
+            r.GpuTotal = load.Total;
+            r.GpuEngines = load.ByType.ToDictionary(k => k.Key, v => Math.Round(v.Value, 1));
         }
         finally { Marshal.FreeHGlobal(buf); }
     }
@@ -143,5 +121,68 @@ internal sealed class PdhCounters : IDisposable
     public void Dispose()
     {
         if (_query != IntPtr.Zero) { Native.PdhCloseQuery(_query); _query = IntPtr.Zero; }
+    }
+}
+
+/// <summary>
+/// GPU utilisation from the "GPU Engine" counters, which have one instance per process per engine, the way Task Manager
+/// counts it: an engine's load is the sum over processes, a GPU's load is its busiest engine, and a process' GPU% is
+/// the busiest engine it uses. Engines are kept apart per adapter, so an integrated and a discrete GPU never add up.
+/// </summary>
+internal sealed class GpuLoad
+{
+    public sealed class Adapter
+    {
+        public double Util;
+        public readonly Dictionary<string, double> ByType = new(); // engine type (3D, Copy, VideoDecode…) -> busiest engine of it
+    }
+
+    /// <summary>Busiest engine of any GPU.</summary>
+    public double Total;
+    public readonly Dictionary<uint, double> ByPid = new();
+    /// <summary>Engine type -> busiest engine of that type on any GPU.</summary>
+    public readonly Dictionary<string, double> ByType = new();
+    /// <summary>Adapter LUID ("0x00000000_0x0000C3B1") -> its own load.</summary>
+    public readonly Dictionary<string, Adapter> ByAdapter = new();
+
+    public static GpuLoad From(IEnumerable<(string Name, double Value)> instances)
+    {
+        var res = new GpuLoad();
+        var engines = new Dictionary<string, (string Luid, string Type, double Sum)>();
+        var pidEngine = new Dictionary<(uint, string), double>();
+        foreach (var (name, v) in instances)
+        {
+            // idle engines stay in (the Performance page charts every engine)
+            if (!Parse(name, out uint pid, out string engine, out string luid, out string type) || HardwareInfo.IsNpu(luid)) continue;
+            double x = Math.Max(0, v);
+            engines[engine] = engines.TryGetValue(engine, out var e) ? (luid, type, e.Sum + x) : (luid, type, x);
+            if (x > 0) pidEngine[(pid, engine)] = pidEngine.GetValueOrDefault((pid, engine)) + x;
+        }
+        foreach (var (luid, type, sum) in engines.Values)
+        {
+            double u = Math.Min(100, sum);
+            if (!res.ByAdapter.TryGetValue(luid, out var a)) res.ByAdapter[luid] = a = new Adapter();
+            a.Util = Math.Max(a.Util, u);
+            a.ByType[type] = Math.Max(a.ByType.GetValueOrDefault(type), u);
+            res.ByType[type] = Math.Max(res.ByType.GetValueOrDefault(type), u);
+            res.Total = Math.Max(res.Total, u);
+        }
+        foreach (var ((pid, _), v) in pidEngine)
+            res.ByPid[pid] = Math.Max(res.ByPid.GetValueOrDefault(pid), Math.Min(100, v));
+        return res;
+    }
+
+    /// <summary>"pid_1234_luid_0x00000000_0x0000C3B1_phys_0_eng_0_engtype_3D".</summary>
+    internal static bool Parse(string name, out uint pid, out string engine, out string luid, out string type)
+    {
+        pid = 0; engine = luid = type = "";
+        int li = name.IndexOf("luid_", StringComparison.Ordinal), ti = name.IndexOf("_engtype_", StringComparison.Ordinal);
+        if (li < 0 || ti < li + 26) return false;
+        int pi = name.IndexOf("pid_", StringComparison.Ordinal);
+        if (pi >= 0 && pi < li) uint.TryParse(name.AsSpan(pi + 4, Math.Max(0, li - pi - 5)), out pid);
+        engine = name[li..ti];
+        luid = name.Substring(li + 5, 21);
+        type = name[(ti + 9)..];
+        return true;
     }
 }

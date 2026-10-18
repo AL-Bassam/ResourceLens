@@ -134,6 +134,9 @@ function fmtBytes(b, d) {
   return `${nf(digits).format(Math.sign(b) * v)} ${u[i]}`;
 }
 const LRM = (s) => `‎${s}‎`; // keeps "11.1 GB" readable inside RTL canvas text
+// "9.6% · 2.11 GHz · 41°C" as plain text: each part isolated (FSI…PDI), so numbers and units keep their order in Arabic
+const ISO = (s) => `\u2068${s}\u2069`;
+const isoParts = (...xs) => xs.filter((x) => x != null && x !== '').map(ISO).join(' · ');
 function fmtRate(b) { return b == null || isNaN(b) ? '—' : `${fmtBytes(b)}/s`; }
 function fmtPct(v) { return v == null || isNaN(v) ? '—' : `${nf(v < 10 ? 1 : 0).format(v)}%`; }
 function fmtDur(ms) {
@@ -1510,18 +1513,19 @@ function stopPerf() { if (perfTimer) { clearInterval(perfTimer); perfTimer = nul
 function perfDevices(p) {
   const s = p.sensors || {};
   const list = [
-    { id: 'cpu', color: '--c-cpu', title: t('pf.cpu'), sub: `${fmtPct(p.cpu.util)} · ${fmtMhz(s.cpuMhz)}${s.cpuTemp != null ? ` · ${fmtTemp(s.cpuTemp)}` : ''}`, hist: ['cpu'] },
-    { id: 'mem', color: '--c-mem', title: t('pf.mem'), sub: `${fmtBytes(p.mem.used, 1)} / ${fmtBytes(p.mem.total, 1)} (${fmtPct((p.mem.used * 100) / p.mem.total)})`, hist: ['mem'] },
+    { id: 'cpu', color: '--c-cpu', title: t('pf.cpu'), sub: isoParts(fmtPct(p.cpu.util), fmtMhz(s.cpuMhz), s.cpuTemp != null ? fmtTemp(s.cpuTemp) : null), hist: ['cpu'] },
+    { id: 'mem', color: '--c-mem', title: t('pf.mem'), sub: isoParts(`${fmtBytes(p.mem.used, 1)} / ${fmtBytes(p.mem.total, 1)} (${fmtPct((p.mem.used * 100) / p.mem.total)})`), hist: ['mem'] },
   ];
   for (const d of p.disks) {
-    list.push({ id: d.key, color: '--c-disk-r', title: t('pf.disk', { n: `${d.number}${d.volumes.length ? ` (${d.volumes.join(' ')})` : ''}` }), sub: `${d.ssd ? `SSD${d.bus ? ` (${d.bus})` : ''}` : d.bus || ''} · ${fmtPct(d.active)}`, hist: [d.key] });
+    list.push({ id: d.key, color: '--c-disk-r', title: t('pf.disk', { n: ISO(`${d.number}${d.volumes.length ? ` (${d.volumes.join(' ')})` : ''}`) }), sub: isoParts(d.ssd ? `SSD${d.bus ? ` (${d.bus})` : ''}` : d.bus, fmtPct(d.active)), hist: [d.key] });
   }
   for (const n of p.nets) {
-    list.push({ id: n.key, color: '--c-net-rx', title: n.type, sub: `${n.name.replace(/^‏+/, '')} · ↓ ${fmtRate(n.rx)} ↑ ${fmtRate(n.tx)}`, hist: [`${n.key}r`, `${n.key}t`] });
+    list.push({ id: n.key, color: '--c-net-rx', title: n.type, sub: isoParts(n.name.replace(/^‏+/, ''), `↓ ${fmtRate(n.rx)} ↑ ${fmtRate(n.tx)}`), hist: [`${n.key}r`, `${n.key}t`] });
   }
-  const g = p.gpu.adapters[0];
-  list.push({ id: 'gpu', color: '--c-gpu', title: `${t('pf.gpu')} 0`, sub: `${g?.name || ''} · ${fmtPct(p.gpu.util)}${s.gpuTemp != null ? ` · ${fmtTemp(s.gpuTemp)}` : ''}`, hist: ['gpu'] });
-  list.push({ id: 'sensors', color: '--c-disk-w', title: t('pf.sensors'), sub: `${fmtTemp(s.cpuTemp)} · ${fmtTemp(s.gpuTemp)}${s.packagePower != null ? ` · ${fmtWatt(s.packagePower)}` : ''}`, hist: ['cpuTemp', 'gpuTemp'] });
+  for (const g of p.gpu.adapters) {
+    list.push({ id: g.key, color: '--c-gpu', title: `${t('pf.gpu')} ${g.key.slice(3)}`, sub: isoParts(g.name, fmtPct(g.util), g.temp != null ? fmtTemp(g.temp) : null), hist: [g.key] });
+  }
+  list.push({ id: 'sensors', color: '--c-disk-w', title: t('pf.sensors'), sub: isoParts(fmtTemp(s.cpuTemp), fmtTemp(s.gpuTemp), s.packagePower != null ? fmtWatt(s.packagePower) : null), hist: ['cpuTemp', 'gpuTemp'] });
   return list;
 }
 
@@ -1552,7 +1556,7 @@ function kv(pairs) { return `<div class="kv">${pairs.filter((x) => x[1] != null 
 function renderPerf() {
   const p = state.perfData;
   if (!p) return;
-  const devs = perfDevices(p).filter((d) => shown('perf', d.id.startsWith('disk') ? 'disk' : d.id.startsWith('net') ? 'net' : d.id));
+  const devs = perfDevices(p).filter((d) => shown('perf', d.id.startsWith('disk') ? 'disk' : d.id.startsWith('net') ? 'net' : d.id.startsWith('gpu') ? 'gpu' : d.id));
   if (!devs.length) { $('#perfList').innerHTML = ''; $('#perfList').dataset.sig = ''; $('#perfMain').innerHTML = `<div class="empty">${t('pf.allHidden')}</div>`; perfBuiltFor = null; return; }
   if (!devs.find((d) => d.id === state.perfDev)) state.perfDev = 'cpu';
 
@@ -1567,7 +1571,7 @@ function renderPerf() {
   for (const d of devs) {
     $(`#pfs-${d.id}`).textContent = d.sub;
     $(`.dev[data-dev="${d.id}"]`).classList.toggle('active', d.id === state.perfDev);
-    const max = ['cpu', 'mem', 'gpu'].includes(d.id) || d.id.startsWith('disk') ? 100 : undefined;
+    const max = ['cpu', 'mem'].includes(d.id) || d.id.startsWith('disk') || d.id.startsWith('gpu') ? 100 : undefined;
     perfChart(`pfm-${d.id}`, p, d.hist, d.hist.map(() => cssVar(d.color)), { mini: true, max: d.id === 'sensors' ? undefined : max });
   }
 
@@ -1580,7 +1584,7 @@ function renderPerf() {
     perfBuiltFor = state.perfDev + lang();
     let charts = '';
     if (dev.id === 'disk' || dev.id.startsWith('disk')) charts = `<div class="perf-sub"><span>${t('pf.active')}</span><span></span></div><div class="perf-chart" id="pfc-a"></div><div class="perf-sub" style="margin-top:10px"><span>${t('pf.transfer')}</span><span>${t('pf.last60')}</span></div><div class="perf-chart sm" id="pfc-b"></div>`;
-    else if (dev.id === 'gpu') charts = `<div class="perf-sub"><span>${t('pf.util')}</span><span></span></div><div class="perf-chart" id="pfc-a"></div><div class="perf-sub" style="margin-top:10px"><span>${t('pf.engines')}</span><span>${t('pf.last60')}</span></div><div class="perf-charts2" id="pfc-eng"></div>`;
+    else if (dev.id.startsWith('gpu')) charts = `<div class="perf-sub"><span>${t('pf.util')}</span><span></span></div><div class="perf-chart" id="pfc-a"></div><div class="perf-sub" style="margin-top:10px"><span>${t('pf.engines')}</span><span>${t('pf.last60')}</span></div><div class="perf-charts2" id="pfc-eng"></div>`;
     else if (dev.id === 'sensors') charts = `<div class="perf-sub"><span>${t('chart.temp')}</span><span>°C</span></div><div class="perf-chart" id="pfc-a"></div><div class="perf-sub" style="margin-top:10px"><span>${t('chart.clock')}</span><span>${t('pf.last60')}</span></div><div class="perf-chart sm" id="pfc-b"></div>`;
     else if (dev.id.startsWith('net')) charts = `<div class="perf-sub"><span>${t('pf.throughput')}</span><span>${t('pf.last60')}</span></div><div class="perf-chart" id="pfc-a"></div>`;
     else charts = `<div class="perf-sub"><span>${dev.id === 'mem' ? t('pf.inUse') : t('pf.util')}</span><span></span></div><div class="perf-chart" id="pfc-a"></div>`;
@@ -1618,11 +1622,13 @@ function renderPerf() {
     perfChart('pfc-a', p, [`${n.key}t`, `${n.key}r`], [C('--c-net-tx'), C('--c-net-rx')], { fmt: (v) => fmtRate(v), names: [t('pf.send'), t('pf.recv')], noArea: false });
     stats = `<div class="stats">${stat(t('pf.send'), fmtRate(n.tx))}${stat(t('pf.recv'), fmtRate(n.rx))}</div>`
       + kv([[t('pf.adapter'), esc(n.name.replace(/^‏+/, ''))], [t('pf.conn'), esc(n.type)], [t('pf.link'), n.speedBps > 0 ? (n.speedBps >= 1e9 ? `${fmtNum(n.speedBps / 1e9, 1)} Gbps` : `${fmtNum(n.speedBps / 1e6, 1)} Mbps`) : null], [t('pf.ipv4'), n.iPv4 ?? n.ipv4], [t('pf.ipv6'), n.iPv6 ?? n.ipv6]]);
-  } else if (dev.id === 'gpu') {
-    const g = p.gpu.adapters[0] || {};
+  } else if (dev.id.startsWith('gpu')) {
+    const g = p.gpu.adapters.find((x) => x.key === dev.id) || { engines: {} };
     model = g.name || '';
-    perfChart('pfc-a', p, ['gpu'], [C('--c-gpu')], { max: 100, names: [t('pf.util')] });
-    const engs = Object.entries(p.gpu.engines).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k]) => k);
+    perfChart('pfc-a', p, [dev.id], [C('--c-gpu')], { max: 100, names: [t('pf.util')] });
+    // Task Manager's four engines first, in a fixed order (charts are rebuilt only when the set changes)
+    const rank = (e) => { const i = ['3D', 'Copy', 'VideoDecode', 'VideoEncode'].indexOf(e); return i < 0 ? 9 : i; };
+    const engs = Object.keys(g.engines).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b)).slice(0, 4);
     const host = $('#pfc-eng');
     const engSig = engs.join('|');
     if (host && host.dataset.sig !== engSig) {
@@ -1630,12 +1636,12 @@ function renderPerf() {
       host.dataset.sig = engSig;
       host.innerHTML = engs.map((e, i) => `<div><div class="perf-sub"><span>${esc(e)}</span><span class="num" id="pfc-ev${i}"></span></div><div class="perf-chart sm" id="pfc-e${i}"></div></div>`).join('');
     }
-    engs.forEach((e, i) => { perfChart(`pfc-e${i}`, p, [`gpuE:${e}`], [C('--c-gpu')], { max: 100, names: [e] }); const el = $(`#pfc-ev${i}`); if (el) el.textContent = fmtPct(p.gpu.engines[e]); });
+    engs.forEach((e, i) => { perfChart(`pfc-e${i}`, p, [`${dev.id}E:${e}`], [C('--c-gpu')], { max: 100, names: [e] }); const el = $(`#pfc-ev${i}`); if (el) el.textContent = fmtPct(g.engines[e]); });
     const ded = g.dedicatedUsed, dedT = g.dedicatedTotal, sh = g.sharedUsed, shT = g.sharedTotal;
     extra = `<div class="stats">
       <div class="stat"><span>${t('pf.dedicated')}</span><b class="num sm">${fmtBytes(ded, 1)} / ${fmtBytes(dedT, 1)}</b><div class="membar"><i style="width:${dedT ? (ded * 100) / dedT : 0}%;--bc:var(--c-gpu)"></i></div></div>
       <div class="stat"><span>${t('pf.shared')}</span><b class="num sm">${fmtBytes(sh, 1)} / ${fmtBytes(shT, 1)}</b><div class="membar"><i style="width:${shT ? (sh * 100) / shT : 0}%;--bc:var(--c-commit)"></i></div></div></div>`;
-    stats = `<div class="stats">${stat(t('pf.util'), fmtPct(p.gpu.util))}${stat(t('pf.temp'), fmtTemp(s.gpuTemp), tempClass(s.gpuTemp))}${stat(t('pf.gpuClock'), fmtMhz(s.gpuMhz))}${stat(t('pf.memClock'), fmtMhz(s.gpuMemMhz))}${s.gpuPower != null ? stat(t('pf.gpuPower'), fmtWatt(s.gpuPower)) : ''}</div>`
+    stats = `<div class="stats">${stat(t('pf.util'), fmtPct(g.util))}${stat(t('pf.temp'), fmtTemp(g.temp), tempClass(g.temp))}${stat(t('pf.gpuClock'), fmtMhz(g.coreMhz))}${stat(t('pf.memClock'), fmtMhz(g.memMhz))}${g.power != null ? stat(t('pf.gpuPower'), fmtWatt(g.power)) : ''}</div>`
       + kv([[t('pf.driver'), esc(g.driver || '')], [t('pf.driverDate'), esc(g.driverDate || '')]]);
   } else {
     model = p.sensorSources || '';
@@ -1656,7 +1662,7 @@ function renderPerf() {
     if (s.fan1Rpm != null) tile(t('pf.fan', { n: 1 }), `${fmtNum(s.fan1Rpm, 0)} RPM`);
     if (s.fan2Rpm != null) tile(t('pf.fan', { n: 2 }), `${fmtNum(s.fan2Rpm, 0)} RPM`);
     extra = tiles.length ? `<div class="sensor-grid" style="margin-top:14px">${tiles.join('')}</div>` : `<div class="note">${t('pf.noSensors')}</div>`;
-    if (s.fan1Rpm == null && !state.init.isAdmin) extra += `<div class="note">${t('pf.fanAdmin')}</div>`;
+    if (s.fan1Rpm == null && !state.init.isAdmin && p.isLenovo) extra += `<div class="note">${t('pf.fanAdmin')}</div>`;
   }
   $('#pfTitle').textContent = dev.title;
   $('#pfModel').textContent = model;

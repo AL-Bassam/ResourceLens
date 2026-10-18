@@ -66,6 +66,21 @@ internal static unsafe class HardwareInfo
         return _cpu = new CpuInfo(name, Math.Max(1, sockets), cores, Environment.ProcessorCount, l1, l2, l3, mhz, virt);
     }
 
+    static bool? _lenovo;
+
+    /// <summary>Lenovo hardware: its fan sensors need the app to run as administrator.</summary>
+    public static bool IsLenovo => _lenovo ??= ReadLenovo();
+
+    static bool ReadLenovo()
+    {
+        try
+        {
+            using var k = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS");
+            return (k?.GetValue("SystemManufacturer") as string)?.Contains("LENOVO", StringComparison.OrdinalIgnoreCase) == true;
+        }
+        catch { return false; }
+    }
+
     // ------------------------------------------------------------------ Memory (SMBIOS type 17)
 
     [DllImport("kernel32.dll")]
@@ -254,16 +269,63 @@ internal static unsafe class HardwareInfo
 
     // ------------------------------------------------------------------ GPU
 
-    public sealed record GpuInfo(string Name, long? DedicatedBytes, long SharedBytes, string? Driver, string? DriverDate);
+    /// <param name="Luid">Matches the GPU performance counters ("0x00000000_0x0000C3B1"); null when Windows did not say.</param>
+    public sealed record GpuInfo(string Name, long? DedicatedBytes, long SharedBytes, string? Driver, string? DriverDate, string? Luid);
 
+    static readonly object GpuGate = new();
     static List<GpuInfo>? _gpus;
+    static HashSet<string> _npus = new();
+    static DateTime _gpusAt;
 
+    /// <summary>
+    /// The graphics adapters present now, in Windows' order (Task Manager's GPU 0, GPU 1…). Driver details come from
+    /// the display class key, which also keeps entries for removed cards, so it is only used to describe live adapters.
+    /// </summary>
     public static List<GpuInfo> Gpus()
     {
-        if (_gpus is not null) return _gpus;
-        var list = new List<GpuInfo>();
-        var ms = new Native.MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf<Native.MEMORYSTATUSEX>() };
-        Native.GlobalMemoryStatusEx(ref ms);
+        lock (GpuGate)
+        {
+            if (_gpus is not null && (DateTime.UtcNow - _gpusAt).TotalSeconds < 60) return _gpus;
+            var ms = new Native.MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf<Native.MEMORYSTATUSEX>() };
+            Native.GlobalMemoryStatusEx(ref ms);
+            long shared = (long)(ms.ullTotalPhys / 2);
+            var drivers = DisplayDrivers();
+            var list = new List<GpuInfo>();
+            var npus = new HashSet<string>();
+            try
+            {
+                foreach (var a in Sensors.GpuAdapter.Enumerate())
+                    using (a)
+                    {
+                        if (a.IsNpu) npus.Add(a.Luid);
+                        if (!a.IsGpu) continue;
+                        // a reinstalled driver can leave an older entry with the same name: take the newest
+                        var d = drivers.Where(x => a.Name is not null && x.Names.Contains(a.Name, StringComparer.OrdinalIgnoreCase))
+                            .OrderByDescending(x => System.Version.TryParse(x.Version, out var v) ? v : new System.Version()).FirstOrDefault();
+                        list.Add(new GpuInfo(a.Name ?? d?.Names[0] ?? "GPU", d?.Vram, shared, d?.Version, d?.Date, a.Luid));
+                    }
+            }
+            catch (Exception ex) { Log.Write("gpus", ex); }
+            // Without adapter enumeration (very old drivers), fall back to the class key as it is.
+            if (list.Count == 0) list = drivers.Select(d => new GpuInfo(d.Names[0], d.Vram, shared, d.Version, d.Date, null)).ToList();
+            _npus = npus;
+            _gpusAt = DateTime.UtcNow;
+            return _gpus = list;
+        }
+    }
+
+    /// <summary>NPU engines appear among the GPU counters; they are left out of GPU utilisation.</summary>
+    public static bool IsNpu(string luid)
+    {
+        if (_gpus is null) Gpus();
+        return _npus.Count > 0 && _npus.Contains(luid);
+    }
+
+    sealed record DisplayDriver(string[] Names, long? Vram, string? Version, string? Date);
+
+    static List<DisplayDriver> DisplayDrivers()
+    {
+        var list = new List<DisplayDriver>();
         try
         {
             using var cls = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}");
@@ -273,18 +335,28 @@ internal static unsafe class HardwareInfo
                 using var k = cls!.OpenSubKey(sub);
                 string? name = k?.GetValue("DriverDesc") as string;
                 if (string.IsNullOrWhiteSpace(name) || name.Contains("Basic Display", StringComparison.OrdinalIgnoreCase)) continue;
+                // The adapter name Windows reports can be the driver's own string (REG_BINARY UTF-16 in older drivers).
+                string? adapterString = k?.GetValue("HardwareInformation.AdapterString") switch
+                {
+                    string s => s,
+                    byte[] b => System.Text.Encoding.Unicode.GetString(b).TrimEnd('\0'),
+                    _ => null,
+                };
                 long? vram = k?.GetValue("HardwareInformation.qwMemorySize") switch
                 {
                     long l => l,
                     byte[] b when b.Length >= 8 => BitConverter.ToInt64(b),
+                    byte[] b when b.Length >= 4 => BitConverter.ToUInt32(b),
+                    int i => (uint)i,
                     _ => null,
                 };
                 if (vram is null && k?.GetValue("HardwareInformation.MemorySize") is { } m)
                     vram = m switch { int i => (uint)i, byte[] b when b.Length >= 4 => BitConverter.ToUInt32(b), _ => null };
-                list.Add(new GpuInfo(name, vram, (long)(ms.ullTotalPhys / 2), k?.GetValue("DriverVersion") as string, k?.GetValue("DriverDate") as string));
+                var names = string.IsNullOrWhiteSpace(adapterString) ? new[] { name.Trim() } : new[] { name.Trim(), adapterString.Trim() };
+                list.Add(new DisplayDriver(names, vram, k?.GetValue("DriverVersion") as string, k?.GetValue("DriverDate") as string));
             }
         }
         catch { }
-        return _gpus = list;
+        return list;
     }
 }

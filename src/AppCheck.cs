@@ -33,6 +33,18 @@ internal static class AppCheck
         "addEventListener('unhandledrejection',e=>__errs.push(String(e.reason&&e.reason.message||e.reason)));";
 
     static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    /// <summary>A picture of the page. One that never arrives (the window is not drawing) is reported, not waited on forever.</summary>
+    static async Task Picture(CoreWebView2 core, string file, StringBuilder sb)
+    {
+        var ms = new MemoryStream(); // not disposed on a timeout: the capture may still write to it later
+        try
+        {
+            await core.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, ms).WaitAsync(TimeSpan.FromSeconds(20));
+            File.WriteAllBytes(file, ms.ToArray());
+        }
+        catch (TimeoutException) { sb.AppendLine($"picture {Path.GetFileName(file)}: FAIL timed out"); }
+    }
     static readonly string[] Pages = { "overview", "perf", "moments", "live", "processes", "insights", "startup", "services", "network", "rules", "counters", "settings" };
 
     public static async Task Run(TrayApp app, Api api, CoreWebView2 core, Action exit)
@@ -105,16 +117,14 @@ internal static class AppCheck
                 }
                 if (Shots || page is "overview" or "perf" or "settings")
                 {
-                    using (var fs = File.Create(Path.Combine(dir, $"check-{page}.png")))
-                        await core.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, fs);
+                    await Picture(core, Path.Combine(dir, $"check-{page}.png"), sb);
                     if (Shots && page == "overview")
                     {
                         // second picture of the overview: scrolled down to the history charts
                         await core.ExecuteScriptAsync("(() => { const c = document.querySelector('.content'), k = document.querySelector('#ch-cpu').closest('.card');" +
                             " c.scrollTop += k.getBoundingClientRect().top - c.getBoundingClientRect().top - 190; })()");
                         await Task.Delay(1500);
-                        using (var fs = File.Create(Path.Combine(dir, "check-overview-charts.png")))
-                            await core.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, fs);
+                        await Picture(core, Path.Combine(dir, "check-overview-charts.png"), sb);
                         await core.ExecuteScriptAsync("document.querySelector('.content').scrollTop = 0");
                     }
                 }

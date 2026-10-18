@@ -26,7 +26,7 @@ internal sealed class Api(TrayApp app)
             ranges = app.Queries.Boots(),
             sensorSources = app.Collector.SensorSources,
             cpuName = HardwareInfo.Cpu().Name,
-            gpuName = HardwareInfo.Gpus().FirstOrDefault()?.Name,
+            gpuName = string.Join(", ", HardwareInfo.Gpus().Select(g => g.Name)),
         },
         "live" => app.Collector.Latest,
         "ranges" => app.Queries.Boots(),

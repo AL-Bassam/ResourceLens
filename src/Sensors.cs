@@ -23,6 +23,22 @@ public sealed class SensorReading
     public int? Fan2Rpm { get; set; }
     public double? SocTemp { get; set; }
     public Dictionary<string, double>? ThermalZones { get; set; }
+    /// <summary>Every graphics adapter on its own; the Gpu* values above are the main one's (the discrete GPU if any).</summary>
+    public List<GpuSensor>? Gpus { get; set; }
+}
+
+public sealed class GpuSensor
+{
+    public string Luid { get; set; } = "";
+    public double? Temp { get; set; }
+    public string? TempSource { get; set; }
+    public double? Hotspot { get; set; }
+    public double? CoreMhz { get; set; }
+    public double? MemMhz { get; set; }
+    public double? Power { get; set; }
+    public int? FanRpm { get; set; }
+    public double? DedicatedUsed { get; set; }
+    public double? SharedUsed { get; set; }
 }
 
 /// <summary>
@@ -39,12 +55,31 @@ internal sealed unsafe class Sensors : IDisposable
     readonly Adl? _adl;
     readonly Lenovo? _lenovo;
     readonly List<GpuAdapter> _adapters = new();
+    readonly HashSet<string> _integrated = new();
+    /// <summary>The adapter the AMD library describes (null when it cannot be told apart from another AMD GPU).</summary>
+    readonly string? _adlLuid;
+    readonly bool _adlIsApu;
+
+    // Some boards report a thermal zone that never changes (a fixed 27.8 °C, say). A zone that has not moved
+    // after the first minutes is left out; it comes back as soon as it changes.
+    readonly Dictionary<string, double> _zoneFirst = new();
+    readonly HashSet<string> _zoneMoved = new();
+    readonly long _startedAt = Environment.TickCount64;
+    const int ZoneSettleMs = 5 * 60_000;
 
     public string Sources { get; }
 
     public Sensors()
     {
         var src = new List<string>();
+#if DEBUG
+        // Simulates other hardware: "basic" = no vendor libraries (a typical Intel/NVIDIA PC), "none" = no sensors (a VM).
+        string test = Environment.GetEnvironmentVariable("RESOURCELENS_TEST_SENSORS") ?? "";
+        if (test == "none") { Sources = "none (test)"; return; }
+        bool vendor = test != "basic";
+#else
+        const bool vendor = true;
+#endif
         SensorHub.Step = "setup: pdh";
         if (Native.PdhOpenQueryW(null, IntPtr.Zero, out _query) == 0)
         {
@@ -57,12 +92,44 @@ internal sealed unsafe class Sensors : IDisposable
             src.Add("pdh");
         }
         SensorHub.Step = "setup: amd-adl";
-        try { _adl = Adl.TryCreate(); if (_adl is not null) src.Add("amd-adl"); } catch (Exception ex) { Log.Write("adl", ex); }
+        try { _adl = vendor ? Adl.TryCreate() : null; if (_adl is not null) src.Add("amd-adl"); } catch (Exception ex) { Log.Write("adl", ex); }
         SensorHub.Step = "setup: d3dkmt";
-        try { GpuAdapter.Enumerate(_adapters); if (_adapters.Count > 0) src.Add($"d3dkmt({_adapters.Count})"); } catch (Exception ex) { Log.Write("d3dkmt", ex); }
+        var gpus = new List<GpuAdapter>();
+        try
+        {
+            foreach (var a in GpuAdapter.Enumerate())
+            {
+                if (a.IsGpu)
+                {
+                    gpus.Add(a);
+                    if (a.Integrated) _integrated.Add(a.Luid);
+                }
+                if (a.IsGpu && a.HasPerf) _adapters.Add(a); else a.Dispose();
+            }
+            if (_adapters.Count > 0) src.Add($"d3dkmt({_adapters.Count})");
+        }
+        catch (Exception ex) { Log.Write("d3dkmt", ex); }
+        if (_adl is not null)
+        {
+            // An APU's library also reports the CPU: then it describes the integrated GPU, and a discrete GPU next to it
+            // (a Ryzen laptop with a GeForce) keeps its own readings.
+            _adlIsApu = _adl.Read()?.ContainsKey(Adl.TEMP_CPU) == true;
+            var amd = gpus.Where(a => a.Name is { } n && (n.Contains("AMD", StringComparison.OrdinalIgnoreCase) || n.Contains("Radeon", StringComparison.OrdinalIgnoreCase))).ToList();
+            if (amd.Count > 1) amd = amd.Where(a => a.Integrated == _adlIsApu).ToList();
+            if (amd.Count == 1) _adlLuid = amd[0].Luid;
+            else if (gpus.Count == 1) _adlLuid = gpus[0].Luid;
+            if (_adlIsApu && _adlLuid is not null) _integrated.Add(_adlLuid);
+        }
         SensorHub.Step = "setup: lenovo-wmi";
-        try { _lenovo = Lenovo.TryCreate(); if (_lenovo is not null) src.Add("lenovo-wmi"); } catch (Exception ex) { Log.Write("lenovo", ex); }
+        try { _lenovo = vendor ? Lenovo.TryCreate() : null; if (_lenovo is not null) src.Add("lenovo-wmi"); } catch (Exception ex) { Log.Write("lenovo", ex); }
         Sources = string.Join(", ", src);
+    }
+
+    /// <summary>"luid_0x00000000_0x0000C3B1_phys_0" (a PDH instance) -> "0x00000000_0x0000C3B1".</summary>
+    internal static string? LuidOf(string instance)
+    {
+        int i = instance.IndexOf("luid_", StringComparison.Ordinal);
+        return i >= 0 && instance.Length >= i + 26 ? instance.Substring(i + 5, 21) : null;
     }
 
     void Add(string path, out IntPtr counter)
@@ -111,50 +178,78 @@ internal sealed unsafe class Sensors : IDisposable
             }
             var zones = Array(_tz).Select(z => (Name: z.Item1.Replace("\\_TZ.", "").Trim('\\'), C: Math.Round(z.Item2 / 10 - 273.15, 1)))
                 .Where(z => z.C is > 5 and < 125).ToList();
+            foreach (var z in zones)
+                if (!_zoneFirst.TryAdd(z.Name, z.C) && Math.Abs(z.C - _zoneFirst[z.Name]) >= 0.5) _zoneMoved.Add(z.Name);
+            if (Environment.TickCount64 - _startedAt > ZoneSettleMs) zones = zones.Where(z => _zoneMoved.Contains(z.Name)).ToList();
             if (zones.Count > 0)
             {
                 r.ThermalZones = zones.ToDictionary(z => z.Name, z => z.C);
                 r.CpuTemp = zones.Max(z => z.C);
                 r.CpuTempSource = "acpi";
             }
-            var ded = Array(_gpuDed);
-            var sh = Array(_gpuShared);
-            if (ded.Count > 0) r.GpuDedicatedUsed = ded.Max(x => x.Item2);
-            if (sh.Count > 0) r.GpuSharedUsed = sh.Max(x => x.Item2);
         }
 
-        // D3DKMT: vendor-neutral GPU telemetry (Task Manager's source)
+        // D3DKMT: vendor-neutral GPU telemetry (Task Manager's source), one entry per adapter
         SensorHub.Step = "d3dkmt";
+        var gpus = new Dictionary<string, GpuSensor>();
+        GpuSensor Gpu(string luid) => gpus.TryGetValue(luid, out var g) ? g : gpus[luid] = new GpuSensor { Luid = luid };
         foreach (var a in _adapters)
         {
             var p = a.Read();
-            if (p.Temp is > 0 && (r.GpuTemp is null || p.Temp > r.GpuTemp)) { r.GpuTemp = p.Temp; r.GpuTempSource = "d3dkmt"; }
-            if (p.CoreMhz is > 0) r.GpuMhz = Math.Max(r.GpuMhz ?? 0, p.CoreMhz.Value);
-            if (p.MemMhz is > 0) r.GpuMemMhz = Math.Max(r.GpuMemMhz ?? 0, p.MemMhz.Value);
-            if (p.FanRpm is > 0) r.Fan1Rpm ??= p.FanRpm;
+            var g = Gpu(a.Luid);
+            if (p.Temp is > 0) { g.Temp = p.Temp; g.TempSource = "d3dkmt"; }
+            if (p.CoreMhz is > 0) g.CoreMhz = p.CoreMhz;
+            if (p.MemMhz is > 0) g.MemMhz = p.MemMhz;
+            if (p.FanRpm is > 0) g.FanRpm = p.FanRpm;
+        }
+        if (_query != IntPtr.Zero)
+        {
+            foreach (var (inst, v) in Array(_gpuDed)) if (LuidOf(inst) is { } l) Gpu(l).DedicatedUsed = v;
+            foreach (var (inst, v) in Array(_gpuShared)) if (LuidOf(inst) is { } l) Gpu(l).SharedUsed = v;
         }
 
         // AMD ADL: richer and more accurate on Radeon / Ryzen APUs
         SensorHub.Step = "amd-adl";
+        var adlGpu = _adlLuid is not null ? Gpu(_adlLuid) : _adapters.Count == 0 ? new GpuSensor() : null;
         if (_adl is not null)
         {
             var s = _adl.Read();
             if (s is not null)
             {
                 double? Get(int i) => s.TryGetValue(i, out var v) ? v : null;
-                if (Get(Adl.TEMP_EDGE) is double edge and > 0) { r.GpuTemp = edge; r.GpuTempSource = "amd"; }
-                else if (Get(Adl.TEMP_GFX) is double gfx and > 0) { r.GpuTemp = gfx; r.GpuTempSource = "amd"; }
-                if (Get(Adl.TEMP_HOTSPOT) is double hs and > 0) r.GpuHotspot = hs;
                 if (Get(Adl.TEMP_CPU) is double ct and > 0) { r.CpuTemp = ct; r.CpuTempSource = "amd"; }
                 if (Get(Adl.TEMP_SOC) is double soc and > 0) r.SocTemp = soc;
-                if (Get(Adl.CLK_GFX) is double gc and > 0) r.GpuMhz = gc;
-                if (Get(Adl.CLK_MEM) is double mc and > 0) r.GpuMemMhz = mc;
                 if (Get(Adl.CLK_CPU) is double cc and > 0 && r.CpuMhz is null) r.CpuMhz = cc;
                 if (Get(Adl.CPU_POWER) is double cp and > 0) r.CpuPower = cp;
-                if (Get(Adl.GFX_POWER) is double gp and > 0) r.GpuPower = gp;
                 if (Get(Adl.ASIC_POWER) is double ap and > 0) r.PackagePower = ap;
-                if (Get(Adl.FAN_RPM) is double fr and > 0) r.Fan1Rpm ??= (int)fr;
+                if (adlGpu is not null)
+                {
+                    if ((Get(Adl.TEMP_EDGE) is double edge and > 0 ? edge : Get(Adl.TEMP_GFX)) is double gt and > 0) { adlGpu.Temp = gt; adlGpu.TempSource = "amd"; }
+                    if (Get(Adl.TEMP_HOTSPOT) is double hs and > 0) adlGpu.Hotspot = hs;
+                    if (Get(Adl.CLK_GFX) is double gc and > 0) adlGpu.CoreMhz = gc;
+                    if (Get(Adl.CLK_MEM) is double mc and > 0) adlGpu.MemMhz = mc;
+                    if (Get(Adl.GFX_POWER) is double gp and > 0) adlGpu.Power = gp;
+                    if (Get(Adl.FAN_RPM) is double fr and > 0) adlGpu.FanRpm ??= (int)fr;
+                }
             }
+        }
+
+        // The main GPU for the history and the overlay: the discrete one when it reports a temperature (it is
+        // the one games run on), otherwise any adapter that does.
+        var main = gpus.Values.Where(g => g.Temp is not null).OrderBy(g => _integrated.Contains(g.Luid)).FirstOrDefault()
+            ?? (adlGpu is { Temp: not null } && !gpus.ContainsValue(adlGpu) ? adlGpu : null)
+            ?? gpus.Values.Where(g => g.CoreMhz is not null).OrderBy(g => _integrated.Contains(g.Luid)).FirstOrDefault();
+        if (main is not null)
+        {
+            r.GpuTemp = main.Temp; r.GpuTempSource = main.TempSource; r.GpuHotspot = main.Hotspot;
+            r.GpuMhz = main.CoreMhz; r.GpuMemMhz = main.MemMhz; r.GpuPower = main.Power;
+            r.Fan1Rpm = main.FanRpm;
+        }
+        if (gpus.Count > 0)
+        {
+            r.GpuDedicatedUsed = main?.DedicatedUsed ?? gpus.Values.Max(g => g.DedicatedUsed);
+            r.GpuSharedUsed = main?.SharedUsed ?? gpus.Values.Max(g => g.SharedUsed);
+            r.Gpus = gpus.Values.ToList();
         }
 
         // Lenovo GameZone (admin): the embedded controller's own CPU/GPU sensors and fans
@@ -173,7 +268,10 @@ internal sealed unsafe class Sensors : IDisposable
     public Dictionary<string, object?> Describe()
     {
         var d = new Dictionary<string, object?> { ["sources"] = Sources, ["adlSensors"] = _adl?.Read()?.ToDictionary(k => k.Key.ToString(), v => (object?)v.Value) };
-        d["adapters"] = _adapters.Select(a => new { a.Luid, perf = a.Read() }).ToList();
+        d["adlAdapter"] = _adlLuid;
+        d["adlIsApu"] = _adlIsApu;
+        d["integrated"] = _integrated.ToList();
+        d["adapters"] = _adapters.Select(a => new { a.Luid, a.Name, type = $"0x{a.Type:X}", perf = a.Read() }).ToList();
         return d;
     }
 
@@ -219,8 +317,11 @@ internal sealed unsafe class Sensors : IDisposable
         [StructLayout(LayoutKind.Sequential)]
         struct CLOSEADAPTER { public uint hAdapter; }
 
-        const int KMTQAITYPE_NODEPERFDATA = 61;
-        const int KMTQAITYPE_ADAPTERPERFDATA = 62;
+        const int KMTQAITYPE_ADAPTERREGISTRYINFO = 8, KMTQAITYPE_ADAPTERTYPE = 15, KMTQAITYPE_ADAPTERREGISTRYINFO_RENDER = 54,
+            KMTQAITYPE_ADAPTERTYPE_RENDER = 57, KMTQAITYPE_NODEPERFDATA = 61, KMTQAITYPE_ADAPTERPERFDATA = 62;
+
+        // D3DKMT_ADAPTERTYPE bits
+        const uint SoftwareDevice = 1 << 2, HybridIntegrated = 1 << 5, IndirectDisplay = 1 << 6, ComputeOnly = 1 << 11;
 
         [DllImport("gdi32.dll")] static extern int D3DKMTEnumAdapters2(ENUMADAPTERS2* p);
         [DllImport("gdi32.dll")] static extern int D3DKMTQueryAdapterInfo(QUERYADAPTERINFO* p);
@@ -228,25 +329,69 @@ internal sealed unsafe class Sensors : IDisposable
 
         uint _h;
         public string Luid { get; private set; } = "";
+        public string? Name { get; private set; }
+        public uint Type { get; private set; }
+        /// <summary>Exposes temperature or clocks (WDDM 2.4+ drivers).</summary>
+        public bool HasPerf { get; private set; }
+        /// <summary>The integrated half of a hybrid (iGPU + dGPU) laptop.</summary>
+        public bool Integrated => (Type & HybridIntegrated) != 0;
+        /// <summary>NPUs and other compute-only accelerators: Windows lists them with the GPUs, but they are not GPUs.</summary>
+        public bool IsNpu => (Type & ComputeOnly) != 0;
+        /// <summary>A real graphics adapter: not the software renderer, a virtual display (remote desktop, streaming) or an NPU.</summary>
+        public bool IsGpu => (Type & (SoftwareDevice | IndirectDisplay | ComputeOnly)) == 0 &&
+            Name?.Contains("Microsoft Basic", StringComparison.OrdinalIgnoreCase) != true;
 
-        public static void Enumerate(List<GpuAdapter> list)
+        /// <summary>Every adapter Windows has right now (the caller disposes them).</summary>
+        public static List<GpuAdapter> Enumerate()
         {
+            var list = new List<GpuAdapter>();
             var e = new ENUMADAPTERS2();
-            if (D3DKMTEnumAdapters2(&e) != 0 || e.NumAdapters == 0) return;
+            if (D3DKMTEnumAdapters2(&e) != 0 || e.NumAdapters == 0) return list;
             var arr = new ADAPTERINFO[e.NumAdapters];
             fixed (ADAPTERINFO* p = arr)
             {
                 e.pAdapters = p;
-                if (D3DKMTEnumAdapters2(&e) != 0) return;
+                if (D3DKMTEnumAdapters2(&e) != 0) return list;
             }
             for (int i = 0; i < e.NumAdapters; i++)
             {
                 var a = new GpuAdapter { _h = arr[i].hAdapter, Luid = $"0x{arr[i].LuidHigh:X8}_0x{arr[i].LuidLow:X8}" };
-                // keep only adapters that expose perf data (skips the Basic Render Driver)
+                a.Type = a.QueryType();
+                a.Name = a.QueryName();
                 var test = a.Read();
-                if (test.Temp is not null || test.CoreMhz is not null || test.MemMhz is not null) list.Add(a);
-                else a.Dispose();
+                a.HasPerf = test.Temp is not null || test.CoreMhz is not null || test.MemMhz is not null;
+                list.Add(a);
             }
+            return list;
+        }
+
+        uint QueryType()
+        {
+            uint v = 0;
+            foreach (int type in new[] { KMTQAITYPE_ADAPTERTYPE, KMTQAITYPE_ADAPTERTYPE_RENDER })
+            {
+                var q = new QUERYADAPTERINFO { hAdapter = _h, Type = type, pData = &v, Size = sizeof(uint) };
+                if (D3DKMTQueryAdapterInfo(&q) == 0) return v;
+            }
+            return 0;
+        }
+
+        string? QueryName()
+        {
+            // D3DKMT_ADAPTERREGISTRYINFO: four WCHAR[MAX_PATH] strings, the adapter's name first
+            const int Chars = 4 * 260;
+            char* buf = stackalloc char[Chars];
+            foreach (int type in new[] { KMTQAITYPE_ADAPTERREGISTRYINFO, KMTQAITYPE_ADAPTERREGISTRYINFO_RENDER })
+            {
+                new Span<char>(buf, Chars).Clear();
+                var q = new QUERYADAPTERINFO { hAdapter = _h, Type = type, pData = buf, Size = Chars * sizeof(char) };
+                if (D3DKMTQueryAdapterInfo(&q) != 0) continue;
+                var name = new ReadOnlySpan<char>(buf, 260);
+                int end = name.IndexOf('\0');
+                string s = (end >= 0 ? name[..end] : name).Trim().ToString();
+                if (s.Length > 0) return s;
+            }
+            return null;
         }
 
         public (double? Temp, double? CoreMhz, double? MemMhz, int? FanRpm, double? PowerPct) Read()

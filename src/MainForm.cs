@@ -58,6 +58,9 @@ internal sealed class MainForm : Form
             // these would otherwise take ~25 MB of the user's disk.
             string args = "--disable-features=msSmartScreenProtection --disable-component-update --disable-gpu-shader-disk-cache";
             if (!_app.Settings.SmoothScrolling) args += " --disable-smooth-scrolling";
+            // The release check takes pictures while other windows may cover this one: keep drawing when covered.
+            if (AppCheck.ReportPath is not null)
+                args = args.Replace("msSmartScreenProtection", "msSmartScreenProtection,CalculateNativeWinOcclusion") + " --disable-backgrounding-occluded-windows";
             string folder = Path.Combine(AppSettings.DataDir, "WebView2");
             PruneBrowserData(folder);
             var env = await CoreWebView2Environment.CreateAsync(null, folder, new CoreWebView2EnvironmentOptions(args));
@@ -66,9 +69,13 @@ internal sealed class MainForm : Form
         catch (Exception ex)
         {
             Log.Write("webview2", ex);
-            MessageBox.Show(this,
-                "Microsoft Edge WebView2 Runtime is required.\nhttps://developer.microsoft.com/microsoft-edge/webview2/\n\n" + ex.Message,
-                "ResourceLens", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            bool ar = _app.Settings.Language == "ar";
+            string msg = ar
+                ? "تعذّر فتح نافذة ResourceLens لأنها تحتاج إلى مكوّن Microsoft Edge WebView2. التسجيل في الخلفية مستمر.\n\nهل تريد فتح صفحة تنزيل المكوّن؟"
+                : "ResourceLens could not open its window: it needs the Microsoft Edge WebView2 Runtime. Recording continues in the background.\n\nOpen the WebView2 download page?";
+            if (MessageBox.Show(this, msg + "\n\n" + ex.Message, "ResourceLens", MessageBoxButtons.YesNo, MessageBoxIcon.Error,
+                    MessageBoxDefaultButton.Button1, ar ? MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign : 0) == DialogResult.Yes)
+                try { Process.Start(new ProcessStartInfo("https://developer.microsoft.com/microsoft-edge/webview2/") { UseShellExecute = true }); } catch { }
             Close();
             return;
         }
