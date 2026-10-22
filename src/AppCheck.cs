@@ -86,6 +86,9 @@ internal static class AppCheck
                     Call(m, "{}");
                 Call("network.usage", "{\"days\":7}");
                 Call("counters.history", "{\"range\":\"24h\"}");
+                // estimate first, so the report shows it next to the real sizes below
+                try { sb.AppendLine($"export estimate: {JsonSerializer.Serialize(new Exporter(app.Store, app.Queries, app.Settings).Estimate(from, now, false))}"); }
+                catch (Exception ex) { sb.AppendLine($"export estimate: FAIL {ex.Message}"); }
                 foreach (bool full in new[] { false, true })
                 {
                     string f = Path.Combine(dir, full ? "check-full.json" : "check-summary.json");

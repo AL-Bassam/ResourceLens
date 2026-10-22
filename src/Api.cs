@@ -60,6 +60,7 @@ internal sealed class Api(TrayApp app)
         "exportJsonTo" => ExportJson(S(p, "path", ""), L(p, "from"), L(p, "to"), S(p, "level", "summary") == "full", p.TryGetProperty("titles", out var tt) && tt.GetBoolean()),
         "exportCsvTo" => Do(() => app.Queries.ExportCsv(L(p, "from"), L(p, "to"), S(p, "path", ""), S(p, "kind", "system") == "processes")),
 #endif
+        "exportEstimate" => new Exporter(app.Store, app.Queries, app.Settings).Estimate(L(p, "from"), L(p, "to"), p.TryGetProperty("titles", out var et) && et.GetBoolean()),
         "clearData" => Clear(),
         "saveSettings" => SaveSettings(p),
         _ => Features.Query(method, p), // add-on modules (network, rules, counters)

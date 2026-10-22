@@ -38,6 +38,7 @@ const state = {
   charts: {},
   drawer: null, // { kind: 'app'|'inst'|'moment', ... }
   exportTitles: true,
+  exportRange: { kind: 'all', from: 0, to: 0 }, // independent of the page range bar (hidden on Settings)
 };
 
 /* ================= Show / hide (display only — recording never changes) ================= */
@@ -233,11 +234,19 @@ function currentRange() {
   if (k === 'boot') return { from: state.boot || now - 3600e3, to: now };
   return { from: now - RANGE_MS[k], to: now };
 }
-function rangeLabel() {
-  const r = currentRange();
+function rangeLabel(r = currentRange(), toNow = state.range.kind !== 'custom') {
   const secs = r.to - r.from < 2 * 3600e3;
-  const end = state.range.kind === 'custom' ? fmtFull(r.to, secs) : `${t('now')} (${fmtFull(r.to)})`;
+  const end = toNow ? `${t('now')} (${fmtFull(r.to)})` : fmtFull(r.to, secs);
   return t('range.fromTo', { a: fmtFull(r.from, secs), b: end });
+}
+const EXPORT_KINDS = ['all', 'boot', '24h', '7d', 'custom'];
+function exportRange() {
+  const now = Date.now();
+  const r = state.exportRange;
+  if (r.kind === 'custom') return { from: r.from, to: r.to };
+  if (r.kind === 'boot') return { from: state.boot || now - 3600e3, to: now };
+  if (r.kind === 'all') return { from: state.init.ranges?.first || now - RANGE_MS['30d'], to: now };
+  return { from: now - RANGE_MS[r.kind], to: now };
 }
 function toLocalInput(ts) {
   const d = new Date(ts - new Date(ts).getTimezoneOffset() * 60000);
@@ -1786,9 +1795,14 @@ function renderSettings() {
 
   <div class="card set-card">
     <h3>${t('set.export')}</h3><div class="desc">${t('set.exportDesc')}</div>
+    ${row(t('set.expRange'), t('set.expRangeHint'), `<div class="seg" id="expRange">${EXPORT_KINDS.map((k) => `<button data-v="${k}" class="${state.exportRange.kind === k ? 'active' : ''}">${t(k === 'all' ? 'set.expAll' : `range.${k}`)}</button>`).join('')}</div>`)}
+    ${state.exportRange.kind === 'custom' ? `<div class="custom-range" style="margin:0 0 10px">
+      <label><span>${t('range.from')}</span><input type="datetime-local" step="1" id="expFrom" value="${toLocalInput(state.exportRange.from)}"></label>
+      <label><span>${t('range.to')}</span><input type="datetime-local" step="1" id="expTo" value="${toLocalInput(state.exportRange.to)}"></label>
+    </div>` : ''}
     <div class="btn-row">
-      <button class="btn primary" id="bExpAi">${t('set.exportAi')}</button>
-      <button class="btn" id="bExpFull">${t('set.exportFull')}</button>
+      <button class="btn primary" id="bExpAi">${t('set.exportAi')}<span class="exp-size num" data-est="summary"></span></button>
+      <button class="btn" id="bExpFull">${t('set.exportFull')}<span class="exp-size num" data-est="full"></span></button>
     </div>
     <div class="note">${t('set.exportAiHint')}</div>
     <div class="btn-row" style="margin-top:10px;align-items:center">
@@ -1799,7 +1813,7 @@ function renderSettings() {
       <button class="btn" id="bExpSys">${t('set.exportSys')}</button>
       <button class="btn" id="bExpProc">${t('set.exportProc')}</button>
     </div>
-    <div class="note">${t('set.exportHint')} <span class="num">${esc(rangeLabel())}</span></div>
+    <div class="note">${t('set.exportHint')} <span class="num">${esc(rangeLabel(exportRange(), state.exportRange.kind !== 'custom'))}</span></div>
   </div>
 
   <div class="card set-card">
@@ -1917,7 +1931,19 @@ function renderSettings() {
   $('#bSave')?.addEventListener('click', () => saveSettings());
   $('#bDiscard')?.addEventListener('click', () => { state.draft = null; renderSettings(); });
   $('#bOpen').addEventListener('click', () => call('openDataFolder'));
-  $('#expTitles').addEventListener('change', (e) => { state.exportTitles = e.target.checked; });
+  $('#expTitles').addEventListener('change', (e) => { state.exportTitles = e.target.checked; updateExportEstimate(); });
+  updateExportEstimate();
+  $$('#expRange button').forEach((b) => b.addEventListener('click', () => {
+    const r = state.exportRange;
+    if (b.dataset.v === 'custom' && r.kind !== 'custom') Object.assign(r, exportRange());
+    r.kind = b.dataset.v;
+    renderSettings();
+  }));
+  ['expFrom', 'expTo'].forEach((id) => $(`#${id}`)?.addEventListener('change', (e) => {
+    const v = new Date(e.target.value).getTime();
+    if (Number.isFinite(v)) state.exportRange[id === 'expFrom' ? 'from' : 'to'] = v;
+    renderSettings();
+  }));
   $('#bExpAi').addEventListener('click', (e) => exportJson('summary', e.currentTarget));
   $('#bExpFull').addEventListener('click', (e) => exportJson('full', e.currentTarget));
   $('#bPrompt').addEventListener('click', async () => {
@@ -1936,18 +1962,43 @@ function renderSettings() {
   $('#bAdmin')?.addEventListener('click', () => call('restartAsAdmin'));
   $('#bExit').addEventListener('click', () => call('exitApp'));
 }
+// Resolves the export period at click time; "all" re-reads the oldest stored sample, which retention may have moved.
+async function exportRangeNow() {
+  if (state.exportRange.kind === 'all') state.init.ranges = await call('ranges');
+  const r = exportRange();
+  if (!(r.from < r.to)) throw new Error(t('set.expBadRange'));
+  return r;
+}
 async function exportCsv(kind) {
-  const path = await call('exportCsv', { ...currentRange(), kind });
-  if (path) toast(t('exported', { p: path }), 4000);
+  try {
+    const path = await call('exportCsv', { ...(await exportRangeNow()), kind });
+    if (path) toast(t('exported', { p: path }), 4000);
+  } catch (e) { toast(e.message, 5000); }
+}
+// Above this a full export no longer fits in an AI chat (about 1 MB of JSON is already ~300k tokens).
+const BIG_EXPORT = 5 * 1048576;
+let estimateSeq = 0;
+async function updateExportEstimate() {
+  const seq = ++estimateSeq;
+  let est = null;
+  try { est = await call('exportEstimate', { ...exportRange(), titles: state.exportTitles }); } catch { /* buttons stay without a size */ }
+  if (seq !== estimateSeq) return;
+  $$('[data-est]').forEach((el) => { el.textContent = est?.samples ? `≈ ${fmtBytes(est[el.dataset.est])}` : ''; });
 }
 async function exportJson(level, btn) {
+  let range;
+  try { range = await exportRangeNow(); } catch (e) { toast(e.message, 5000); return; }
+  if (level === 'full') {
+    const est = await call('exportEstimate', { ...range, titles: state.exportTitles }).catch(() => null);
+    if (est?.full > BIG_EXPORT && !confirm(t('set.expBigConfirm', { s: fmtBytes(est.full) }))) return;
+  }
   btn.disabled = true;
-  const old = btn.textContent;
+  const old = btn.innerHTML;
   btn.textContent = t('exporting');
   try {
-    const res = await call('exportJson', { ...currentRange(), level, titles: state.exportTitles });
+    const res = await call('exportJson', { ...range, level, titles: state.exportTitles });
     if (res) toast(t('exported', { p: `${res.path} (${fmtBytes(res.size)})` }), 5000);
-  } catch (e) { toast(e.message, 5000); } finally { btn.disabled = false; btn.textContent = old; }
+  } catch (e) { toast(e.message, 5000); } finally { btn.disabled = false; btn.innerHTML = old; }
 }
 async function saveSettings(next) {
   const payload = next || state.draft;

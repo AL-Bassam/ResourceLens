@@ -28,7 +28,7 @@ It runs in the notification area. While recording in the background it uses abou
 - Process rules: priority, CPU affinity, efficiency mode and power plan per application, with optional automatic priority balancing.
 - Performance counters: chart any Windows performance counter and optionally record it.
 - An in-game overlay showing selected values, toggled with `Ctrl+Shift+O`.
-- Export to CSV, or to a self-describing JSON file intended for analysis with an AI assistant.
+- Export any period (all stored data, since boot, or custom dates) to CSV, or to a self-describing JSON file intended for analysis with an AI assistant, with its approximate size shown beforehand.
 - Arabic and English interface, light and dark themes.
 
 ## Screenshots

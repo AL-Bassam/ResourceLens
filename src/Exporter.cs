@@ -40,6 +40,48 @@ internal sealed class Exporter(Store store, Queries queries, AppSettings setting
     static string? Str(JsonElement e, string p) => e.TryGetProperty(p, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
     static string Role(string? code) => code is null ? "process" : RoleNames.GetValueOrDefault(code, code);
 
+    // Average bytes per item, measured on real exports (window titles add about a fifth to a timeline row).
+    const int BaseBytes = 8_000, AppBytes = 340, ProcBytes = 290, MomentBytes = 500, RowBytes = 270, RowBytesNoTitles = 210;
+
+    /// <summary>Approximate file size of both export levels for a range, from row counts only (nothing is built).</summary>
+    public object Estimate(long from, long to, bool includeTitles)
+    {
+        using var c = store.OpenReader();
+        long samples, coveredMs;
+        using (var q = c.CreateCommand())
+        {
+            q.CommandText = "SELECT COUNT(*), COALESCE(SUM(dt), 0) FROM sys WHERE ts >= $f AND ts <= $to";
+            q.Parameters.AddWithValue("$f", from);
+            q.Parameters.AddWithValue("$to", to);
+            using var r = q.ExecuteReader();
+            r.Read();
+            samples = r.GetInt64(0);
+            coveredMs = r.GetInt64(1);
+        }
+        if (samples == 0) return new { samples, summary = 0L, full = 0L };
+
+        // processes per application alive in the range, biggest first (the export caps both counts)
+        var perApp = new List<long>();
+        using (var q = c.CreateCommand())
+        {
+            q.CommandText = "SELECT COUNT(*) FROM inst WHERE first_ts <= $to AND last_ts >= $f GROUP BY nid ORDER BY 1 DESC";
+            q.Parameters.AddWithValue("$f", from);
+            q.Parameters.AddWithValue("$to", to);
+            using var r = q.ExecuteReader();
+            while (r.Read()) perApp.Add(r.GetInt64(0));
+        }
+
+        long Size(bool full)
+        {
+            int appLimit = full ? 1000 : 40, procLimit = full ? 300 : 8, moments = full ? 25 : 10;
+            long rows = full ? samples : Math.Min(samples, SummaryTimelineRows);
+            long apps = perApp.Take(appLimit).Sum(n => AppBytes + Math.Min(n, procLimit) * ProcBytes);
+            long perMetric = Math.Min(moments, coveredMs / 120_000 + 1); // moments are at least 2 minutes apart
+            return BaseBytes + apps + 6 * perMetric * MomentBytes + rows * (includeTitles ? RowBytes : RowBytesNoTitles);
+        }
+        return new { samples, summary = Size(false), full = Size(true) };
+    }
+
     public void Write(string path, long from, long to, bool full, bool includeTitles)
     {
         using var fs = File.Create(path);

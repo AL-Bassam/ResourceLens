@@ -420,6 +420,8 @@ tr.expanded .caret { transform: rotate(90deg); }
 .cmdline { font-family: "Cascadia Code", Consolas, monospace; font-size: 11px; color: var(--text-2); direction: ltr; text-align: left; word-break: break-all; user-select: text; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); max-height: 110px; overflow: auto; }
 .check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }
+.exp-size { margin-inline-start: 8px; font-weight: 400; opacity: .75; }
+.exp-size:empty { display: none; }
 .btn[disabled] { opacity: .5; pointer-events: none; }
 
 /* ---------- v4: customize (show/hide) ---------- */

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0
+
+Export period and size.
+
+- Exports have their own period selector in Settings: all stored data (the default), since boot, 24 hours, 7 days, or a custom from–to. Previously they silently used the period chosen on the other pages, which is hidden on Settings and starts at "since boot", so an export made soon after starting the PC covered only a few minutes.
+- The JSON export buttons show the approximate file size for the chosen period. A full export larger than 5 MB asks for confirmation first, since a file that size is too large for an AI assistant to read at once.
+
 ## 1.3.0
 
 Hardware compatibility.
