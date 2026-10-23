@@ -11,7 +11,7 @@
     <AssemblyName>ResourceLens</AssemblyName>
     <ApplicationIcon>assets\app.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>1.4.0</Version>
+    <Version>1.4.1</Version>
     <Product>ResourceLens</Product>
     <Description>ResourceLens - system resource history monitor</Description>
     <Copyright>ResourceLens</Copyright>

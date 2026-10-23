@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1
+
+- The sidebar scrolls with the mouse wheel or touch when the window is shorter than the page list. Previously the lower items, such as Settings, were cut off and could not be reached.
+
 ## 1.4.0
 
 Export period and size.

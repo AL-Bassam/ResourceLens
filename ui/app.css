@@ -106,7 +106,10 @@ svg { width: 18px; height: 18px; fill: currentColor; flex: none; }
   padding: 20px 14px;
   border-inline-end: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(255,255,255,.02), transparent);
+  /* In a short window the list scrolls (wheel or touch) instead of being cut off below the window */
+  height: 100vh; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
 }
+.sidebar::-webkit-scrollbar { width: 6px; }
 .brand { display: flex; align-items: center; gap: 12px; padding: 4px 8px 10px; }
 .logo svg { width: 38px; height: 38px; filter: drop-shadow(0 6px 16px rgba(99,102,241,.45)); }
 .brand-text { display: flex; flex-direction: column; line-height: 1.25; }
